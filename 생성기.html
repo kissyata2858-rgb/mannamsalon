@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>만남살롱 포스터 생성기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js"></script>
+<style>
+:root{
+  --bg:#F6F2EC; --panel:#FFFFFF; --ink:#1F1B18; --muted:#5F574F; --line:#E3DAD0;
+  --accent:#D8433A; --accent-ink:#FFFFFF; --soft:#FCE9E6; --ok:#1F7A4D; --warn:#A5461B;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16130F; --panel:#211D19; --ink:#F3EDE6; --muted:#B5AAA0; --line:#3A332D;
+    --accent:#F0655B; --accent-ink:#1A0C0A; --soft:#3A2220; --ok:#6CD39F; --warn:#F2A276;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16130F; --panel:#211D19; --ink:#F3EDE6; --muted:#B5AAA0; --line:#3A332D;
+  --accent:#F0655B; --accent-ink:#1A0C0A; --soft:#3A2220; --ok:#6CD39F; --warn:#F2A276;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 16px 60px}
+header h1{font-family:"Black Han Sans","IBM Plex Sans KR",sans-serif;font-weight:400;font-size:clamp(26px,4vw,38px);margin:0 0 6px}
+header p{margin:0;color:var(--muted);font-size:15px}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
+@media (max-width:860px){.steps{grid-template-columns:1fr}}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.step h2{margin:0;font-size:16px;display:flex;align-items:center;gap:10px}
+.num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+input[type=text],select{width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.check{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink);min-height:44px;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+button{font:inherit;font-size:15px;font-weight:600;border-radius:12px;border:1px solid transparent;padding:12px 16px;min-height:46px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink)}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row > button{flex:1 1 auto}
+.file input{font-size:13px;color:var(--muted);max-width:100%}
+#status{margin-top:16px;padding:12px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:14px;min-height:46px;display:flex;align-items:center}
+#status.ok{color:var(--ok)} #status.err{color:var(--warn);background:var(--soft)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;margin-top:22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.card canvas{width:100%;height:auto;display:block;background:#F0564A}
+.meta{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.meta strong{font-size:15px}
+.meta span{font-size:13px;color:var(--muted)}
+.meta span.flag{color:var(--warn)}
+.empty{margin-top:22px;border:2px dashed var(--line);border-radius:16px;padding:40px 20px;text-align:center;color:var(--muted)}
+.mode{display:flex;gap:8px}
+.mode label{flex:1;margin:0;display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border:1px solid var(--line);border-radius:12px;font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;background:var(--bg)}
+.mode input{accent-color:var(--accent);width:18px;height:18px}
+.mode label:has(input:checked){border-color:var(--accent);background:var(--soft)}
+.roster{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.roster summary{cursor:pointer;font-weight:600;font-size:15px;min-height:28px}
+.roster canvas{display:block;width:100%;max-width:430px;height:auto;margin:12px auto 0;border-radius:8px}
+.note{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>만남살롱 포스터 생성기</h1>
+    <p>구글 시트의 표를 읽어, 표 1개당 1장씩 1080×1920 모집중·솔드아웃 포스터(PNG / 10초 MP4)를 만듭니다.</p>
+  </header>
+
+  <section class="steps">
+    <div class="step">
+      <h2><span class="num">1</span>데이터 읽어오기</h2>
+      <div>
+        <label>포스터 종류</label>
+        <div class="mode" role="radiogroup" aria-label="포스터 종류">
+          <label><input type="radio" name="mode" value="recruit" checked>모집중</label>
+          <label><input type="radio" name="mode" value="sold">솔드아웃</label>
+        </div>
+      </div>
+      <div>
+        <label for="sheetUrl">구글 시트 주소</label>
+        <input id="sheetUrl" type="text" value="https://docs.google.com/spreadsheets/d/1ncneFACW8P2_SXYeuKQGolXgmD3ZbD5JgAifJwVuk1c/edit?usp=sharing">
+      </div>
+      <div>
+        <label for="tabName">시트 탭 이름</label>
+        <input id="tabName" type="text" value="인스타">
+      </div>
+      <button id="loadBtn" class="primary" type="button">데이터 읽어오기</button>
+      <div class="file"><label for="xlsxFile">또는 엑셀(.xlsx) 파일 직접 올리기</label><input id="xlsxFile" type="file" accept=".xlsx,.xls"></div>
+    </div>
+    <div class="step">
+      <h2><span class="num">2</span>미리보기</h2>
+      <div>
+        <label for="sheetSel">엑셀로 올린 경우 사용할 탭</label>
+        <select id="sheetSel" disabled><option>엑셀 파일을 올리면 선택할 수 있어요</option></select>
+      </div>
+      <label class="check" id="stampRow"><input id="stampChk" type="checkbox" checked>가운데 SOLD OUT 도장 넣기 (솔드아웃)</label>
+      <p class="note" id="ruleNote"></p>
+    </div>
+    <div class="step">
+      <h2><span class="num">3</span>익스포트</h2>
+      <div class="row">
+        <button id="zipBtn" class="primary" type="button" disabled>전체 PNG 한번에 (ZIP)</button>
+        <button id="eachBtn" class="ghost" type="button" disabled>PNG 한 장씩 저장</button>
+      </div>
+      <div class="row">
+        <button id="zip45Btn" class="primary" type="button" disabled>1080×1350 PNG 한번에 (ZIP)</button>
+        <button id="each45Btn" class="ghost" type="button" disabled>1080×1350 PNG 한 장씩 저장</button>
+      </div>
+      <div class="row">
+        <button id="mp4ZipBtn" class="primary" type="button" disabled>전체 10초 영상 (MP4·ZIP)</button>
+        <button id="mp4EachBtn" class="ghost" type="button" disabled>영상 한 개씩 저장</button>
+      </div>
+      <button id="flipBtn" class="primary" type="button" disabled>전체 30초통합(MP4)</button>
+      <button id="rosterBtn" class="primary" type="button" disabled>참가자명단 (PNG)</button>
+      <p class="note">표가 9개면 PNG·영상 9개가 만들어집니다. ‘30초통합’은 모든 포스터를 최신 날짜순으로 책장 넘기듯 이어 붙인 30초 영상 1개예요. ‘참가자명단’은 본문용 긴 이미지 1장이에요(모집중 모드).</p>
+    </div>
+  </section>
+
+  <div id="status" role="status">시트 주소와 탭 이름을 확인하고 ‘데이터 읽어오기’를 눌러주세요.</div>
+  <div id="empty" class="empty">아직 불러온 표가 없어요.</div>
+  <details id="rosterWrap" class="roster" hidden><summary>참가자명단 미리보기 (본문용)</summary><canvas id="rosterCv" role="img" aria-label="참가자명단 미리보기"></canvas></details>
+  <div id="grid" class="grid"></div>
+</div>
+
+<script>
+(function(){
+  const W = 1080, H = 1920;
+  const C = { bg:'#F0564A', paper:'#FFF8EE', ink:'#231F20', muted:'#6E655E', perf:'#D9CBB8',
+              men:'#7B4FD6', women:'#E23B32', gangnam:'#2F5BD3',
+              box:'#E7E3DE', boxInk:'#4A4542', dots:'#B9B2AB', stamp:'#77726D',
+              open:'#E0463C', closing:'#8A8078', band:'#FDE3DE' };
+  const HEART = new Path2D('M12 21s-7.5-4.6-10-9.3C.3 8.3 2 4 6 3.3c2.3-.4 4.3.8 6 2.9 1.7-2.1 3.7-3.3 6-2.9 4 .7 5.7 5 4 8.4C19.5 16.4 12 21 12 21z');
+  const F_BODY = '"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  const F_DISP = '"Black Han Sans", "IBM Plex Sans KR", sans-serif';
+  const MAX_ROWS = 15;
+
+  const $ = (id) => document.getElementById(id);
+  let workbook = null, posters = [];
+  const setStatus = (msg, kind) => { $('status').textContent = msg; $('status').className = kind || ''; };
+
+  // ---------- helpers ----------
+  function fileIdFrom(url){
+    const m = String(url).match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m) return m[1];
+    const t = String(url).trim();
+    return /^[a-zA-Z0-9_-]{20,}$/.test(t) ? t : null;
+  }
+  function inferYear(month){
+    const now = new Date(); let y = now.getFullYear();
+    if (month < now.getMonth() + 1 - 6) y += 1;
+    if (month > now.getMonth() + 1 + 6) y -= 1;
+    return y;
+  }
+  function isoWeek(d){
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return { week: Math.ceil(((t - y0) / 86400000 + 1) / 7), year: t.getUTCFullYear() };
+  }
+  const weeksInYear = (y) => isoWeek(new Date(y, 11, 28)).week;
+  function fmtTime(hh, mm){
+    const h = parseInt(hh, 10), m = parseInt(mm, 10);
+    const ap = h >= 12 ? '오후' : '오전'; const h12 = (h % 12) || 12;
+    return m === 0 ? `${ap} ${h12}시` : `${ap} ${h12}:${String(m).padStart(2,'0')}`;
+  }
+  const clean = (v) => String(v == null ? '' : v).replace(/^[^\p{L}\p{N}]+/u, '').trim();
+
+  // ---------- parsing ----------
+  const HEAD_RE = /(\d{1,2})\s*\/\s*(\d{1,2})\s*\(\s*([월화수목금토일])\s*\)\s*(\d{1,2}):(\d{2})\s*\(?\s*(홍대점|강남점|홍대|강남)/;
+  const PERSON_RE = /^([^/]+?)\s*\/\s*([^/]+?)\s*\/\s*(\d{2,3})\s*$/;
+  const SKIP_RE = /신청|모집|정리/;
+
+  const STRICT_RE = /^\d0대\s*\/\s*[^/]+?\s*\/\s*\d{3}\s*$/;
+  // 참가자 칸 읽기: 형식이 조금 틀려도(슬래시 빠짐·띄어쓰기 등) 빠뜨리지 않고 읽고, 틀린 칸은 ‘확인 필요’로 표시
+  function person(cell){
+    const s = clean(cell);
+    if (!s || SKIP_RE.test(s)) return null;
+    const m = s.match(PERSON_RE);
+    if (m && STRICT_RE.test(s)) return { age:m[1].trim(), job:m[2].trim(), h:m[3], ok:true };
+    let rest = s, age = '', h = '';
+    const a = rest.match(/^\s*(\d0\s*대|\d{2}(?=\s*\/))/);
+    if (a) { age = a[1].replace(/\s/g, ''); rest = rest.slice(a[0].length); }
+    const t = rest.match(/\/?\s*(\d{3})\s*(cm)?\s*$/i);
+    if (t) { h = t[1]; rest = rest.slice(0, t.index); }
+    const job = rest.replace(/^[\s/]+|[\s/]+$/g, '').trim();
+    if (!age && !h && !job) return null;
+    return { age, job: job || '-', h, ok:false };
+  }
+
+  function parseSheet(ws){
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+    const heads = [];
+    rows.forEach((r, ri) => r.forEach((v, ci) => {
+      const s = String(v || ''); const m = s.match(HEAD_RE);
+      if (m) heads.push({ ri, ci, m, s });
+    }));
+    heads.sort((a,b) => a.ri - b.ri || a.ci - b.ci);
+    return heads.map((h) => {
+      const [, mo, da, wd, hh, mi, locRaw] = h.m;
+      const loc = locRaw.endsWith('점') ? locRaw : locRaw + '점';
+      const menAge = (h.s.match(/남성\s*(\d{2}\s*-\s*\d{2})/) || [,''])[1].replace(/\s/g,'');
+      const womenAge = (h.s.match(/여성\s*(\d{2}\s*-\s*\d{2})/) || [,''])[1].replace(/\s/g,'');
+      const men = [], women = [], odd = [];
+      let menOpen = 0, womenOpen = 0, menClose = 0, womenClose = 0;
+      let started = false;
+      for (let r = h.ri + 1; r < rows.length; r++) {
+        const a = String((rows[r] || [])[h.ci] || '').trim();
+        const b = String((rows[r] || [])[h.ci + 1] || '').trim();
+        if (HEAD_RE.test(a) || HEAD_RE.test(b)) break;
+        if (!a && !b) { if (started) break; else continue; }
+        started = true;
+        const pa = person(a); if (pa) { men.push(pa); if (!pa.ok) odd.push(clean(a)); }
+        const pb = person(b); if (pb) { women.push(pb); if (!pb.ok) odd.push(clean(b)); }
+        if (!pa) { const t = clean(a); if (/신청\s*가능/.test(t)) menOpen++; else if (/정리/.test(t)) menClose++; }
+        if (!pb) { const t = clean(b); if (/신청\s*가능/.test(t)) womenOpen++; else if (/정리/.test(t)) womenClose++; }
+      }
+      const month = +mo, day = +da, year = inferYear(month);
+      const wk = isoWeek(new Date(year, month - 1, day));
+      return { year, month, day, wd, time: fmtTime(hh, mi), hhmm: `${hh.padStart(2,'0')}${mi}`,
+               loc, menAge, womenAge, men, women, odd, menOpen, womenOpen, menClose, womenClose,
+               weekLabel: `${wk.week}/${weeksInYear(wk.year)}주차` };
+    });
+  }
+
+  // ---------- drawing ----------
+  function rr(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    if (ctx.roundRect) { ctx.roundRect(x, y, w, h, r); return; }
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  const font = (ctx, w, s, fam) => { ctx.font = `${w} ${s}px ${fam || F_BODY}`; };
+  const spaced = (ctx, px) => { if ('letterSpacing' in ctx) ctx.letterSpacing = px + 'px'; };
+  function fitFont(ctx, text, weight, size, fam, maxW, minSize){
+    let s = size; font(ctx, weight, s, fam);
+    while (ctx.measureText(text).width > maxW && s > (minSize || 10)) { s -= 2; font(ctx, weight, s, fam); }
+    return s;
+  }
+  function heart(ctx, x, cy, size, color, outline){
+    ctx.save(); const s = size / 24; ctx.translate(x, cy - 11 * s); ctx.scale(s, s);
+    if (outline) { ctx.lineWidth = 2.2; ctx.strokeStyle = color; ctx.stroke(HEART); }
+    else { ctx.fillStyle = color; ctx.fill(HEART); }
+    ctx.restore();
+  }
+  function dot(ctx, x, y, r, c){ ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill(); }
+
+  function drawSoldout(canvas, p, withStamp){ return drawTicket(canvas, p, withStamp, false); }
+  // 솔드아웃·모집중 공통 티켓 (recruit=true 이면 모집중 버전)
+  function drawTicket(canvas, p, withStamp, recruit, geo){
+    const g = geo || { W, H, TW: 968, TH: 1402 };
+    const vs = g.TH / 1402, z = (n) => n * vs, fz = (n) => Math.round(n * vs);
+    canvas.width = g.W; canvas.height = g.H;
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, g.W, g.H);
+
+    // ticket (968×1402, centered)
+    const TW = g.TW, TH = g.TH, TX = (g.W - TW) / 2, TY = Math.round((g.H - TH) / 2);
+    ctx.fillStyle = C.paper; rr(ctx, TX, TY, TW, TH, 28); ctx.fill();
+    const L = TX + 60, R = TX + TW - 60, CW = R - L;
+
+    // tagline (left) + week (right) — 연도 표기 없이 한 줄
+    ctx.textAlign = 'left'; ctx.fillStyle = C.ink; font(ctx, 500, fz(24));
+    ctx.fillText('7만명이 다녀간 진짜 1등 소개팅 (네이버, 프립)', L, TY + z(66));
+    spaced(ctx, 4); font(ctx, 700, fz(22)); ctx.fillStyle = C.bg;
+    ctx.textAlign = 'right'; ctx.fillText(p.weekLabel, R, TY + z(66));
+    spaced(ctx, 0); ctx.textAlign = 'left';
+
+    // title: 만남살롱 + branch
+    const t1 = '만남살롱 ', t2 = p.loc;
+    let ts = fz(100); font(ctx, 400, ts, F_DISP);
+    while (ctx.measureText(t1 + t2).width > CW && ts > 60) { ts -= 2; font(ctx, 400, ts, F_DISP); }
+    ctx.fillStyle = C.ink; ctx.fillText(t1, L, TY + z(172));
+    const w1 = ctx.measureText(t1).width;
+    ctx.fillStyle = p.loc === '강남점' ? C.gangnam : C.bg; ctx.fillText(t2, L + w1, TY + z(172));
+
+    // info box: DATE / TIME / AGE
+    const BY = TY + z(200), BH = z(112), colW = CW / 3;
+    ctx.lineWidth = 3; ctx.strokeStyle = C.ink; rr(ctx, L, BY, CW, BH, 14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L + colW, BY); ctx.lineTo(L + colW, BY + BH);
+    ctx.moveTo(L + colW * 2, BY); ctx.lineTo(L + colW * 2, BY + BH); ctx.stroke();
+    const label = (k, x) => { spaced(ctx, 3); font(ctx, 500, fz(16)); ctx.fillStyle = C.muted; ctx.fillText(k, x, BY + z(32)); spaced(ctx, 0); };
+    [['DATE', `${p.month}/${p.day} (${p.wd})`], ['TIME', p.time]].forEach(([k, v], i) => {
+      const x = L + colW * i + 22; label(k, x);
+      ctx.fillStyle = C.ink; fitFont(ctx, v, 700, fz(32), F_BODY, colW - 40, 20); ctx.fillText(v, x, BY + z(84));
+    });
+    const ax = L + colW * 2 + 22; label('AGE', ax);
+    [['남성', p.menAge], ['여성', p.womenAge]].forEach(([g, v], i) => {
+      const y = BY + z(66) + i * z(32);
+      font(ctx, 500, fz(23)); ctx.fillStyle = C.muted; ctx.fillText(g, ax, y);
+      const gw = ctx.measureText(g).width;
+      font(ctx, 700, fz(27)); ctx.fillStyle = C.ink; ctx.fillText(v || '-', ax + gw + 10, y);
+    });
+
+    // ticket notches (점선 없음)
+    const PY = TY + z(358);
+    ctx.fillStyle = C.bg;
+    ctx.beginPath(); ctx.arc(TX, PY, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(TX + TW, PY, 30, 0, Math.PI * 2); ctx.fill();
+
+    // lists (max 15 each)
+    const gap = 48, lw = (CW - gap) / 2;
+    const HY = PY + z(62), ROW0 = HY + z(16), RH = z((1168 - 436) / MAX_ROWS);
+    const cols = [
+      { x: L, title:'남성', list: recruit ? rosterRows(p, 'm').slice(0, MAX_ROWS) : p.men.slice(0, MAX_ROWS), color: C.men },
+      { x: L + lw + gap, title:'여성', list: recruit ? rosterRows(p, 'w').slice(0, MAX_ROWS) : p.women.slice(0, MAX_ROWS), color: C.women }
+    ];
+    const noOne = recruit && !p.men.length && !p.women.length;
+    if (!noOne) cols.forEach((c) => {
+      ctx.textAlign = 'left'; ctx.fillStyle = C.ink; font(ctx, 700, fz(32)); ctx.fillText(c.title, c.x, HY);
+      ctx.fillRect(c.x, HY + z(12), lw, 3);
+      c.list.forEach((s, i) => {
+        const top = ROW0 + i * RH, cy = top + RH / 2 + 1, base = top + RH / 2 + z(9);
+        if (s.kind && s.kind !== 'p') {
+          const col = s.kind === 'closing' ? C.closing : c.color;
+          heart(ctx, c.x, cy, fz(23), col, true);
+          ctx.textAlign = 'left'; ctx.fillStyle = col; font(ctx, 600, fz(29));
+          ctx.fillText(s.kind === 'closing' ? '정리중' : '모집중', c.x + 36, base);
+          return;
+        }
+        heart(ctx, c.x, cy, fz(23), c.color);
+        font(ctx, 700, fz(29)); const hw = ctx.measureText(s.h).width;
+        ctx.textAlign = 'right'; ctx.fillStyle = C.ink; ctx.fillText(s.h, c.x + lw, base);
+        ctx.textAlign = 'left'; ctx.fillText(s.age, c.x + 36, base);
+        const aw = ctx.measureText(s.age).width;
+        fitFont(ctx, s.job, 400, fz(29), F_BODY, lw - 36 - aw - 12 - hw - 12, 16);
+        ctx.fillText(s.job, c.x + 36 + aw + 12, base);
+      });
+    });
+
+    // ⋮ + note
+    const LE = ROW0 + MAX_ROWS * RH;
+    if (noOne) drawComingSoon(ctx, W / 2, (PY + LE) / 2 + z(20), p, 0.9 * vs);
+    else {
+      [-14, 0, 14].forEach((d) => dot(ctx, W / 2, LE + z(26) + d * vs, 4.5, C.dots));
+      font(ctx, 500, fz(22)); ctx.fillStyle = C.muted; ctx.textAlign = 'center';
+      ctx.fillText(recruit ? '그 외 참가자는 상세페이지에서 만나요.' : '그 외 참가자는 현장에서 만나요', W / 2, LE + z(76));
+    }
+
+    const FY = LE + z(98), FH = z(72);
+    if (recruit) {
+      // 남은 자리 띠 (참가자명단과 동일)
+      ctx.fillStyle = C.band; rr(ctx, L, FY, CW, FH, 14); ctx.fill();
+      font(ctx, 500, fz(28)); ctx.fillStyle = C.ink; ctx.textAlign = 'center';
+      ctx.fillText(`남 ${p.menOpen}자리 · 여 ${p.womenOpen}자리 남음`, W / 2, FY + FH / 2 + z(10));
+      ctx.textAlign = 'left';
+      return;
+    }
+    // 모집마감 boxes
+    cols.forEach((c) => {
+      ctx.fillStyle = C.box; rr(ctx, c.x, FY, lw, FH, 20); ctx.fill();
+      font(ctx, 700, fz(28)); ctx.fillStyle = C.boxInk; ctx.textAlign = 'center';
+      ctx.fillText('모집마감', c.x + lw / 2, FY + FH / 2 + z(10));
+    });
+    ctx.textAlign = 'left';
+
+    if (withStamp) drawStamp(ctx, W / 2, ROW0 + (MAX_ROWS / 2) * RH);
+  }
+
+  function slots(list){
+    const out = [];
+    for (let i = 0; i < 12; i++) {
+      if (i < 10) out.push(list[i] ? { kind:'p', ...list[i] } : { kind:'open' });
+      else out.push(list[i] ? { kind:'closing' } : { kind:'open' });
+    }
+    return out;
+  }
+
+
+  // 여러 굵기/색이 섞인 한 줄 텍스트 (align: left | center)
+  function richText(ctx, parts, x, y, align){
+    let total = 0;
+    parts.forEach((q) => { font(ctx, q.w, q.s, q.f); total += ctx.measureText(q.t).width; });
+    let cx = align === 'center' ? x - total / 2 : x;
+    ctx.textAlign = 'left';
+    parts.forEach((q) => { font(ctx, q.w, q.s, q.f); ctx.fillStyle = q.c; ctx.fillText(q.t, cx, y); cx += ctx.measureText(q.t).width; });
+  }
+  // “수요일 공개예정” 블록 (k = 크기 배율)
+  function drawComingSoon(ctx, cx, cy, p, k){
+    ctx.textAlign = 'center'; ctx.fillStyle = C.ink; font(ctx, 400, 92 * k, F_DISP);
+    ctx.fillText('수요일 공개예정', cx, cy - 6 * k);
+    const sz = 32 * k;
+    richText(ctx, [
+      { t:'남성 ', w:400, s:sz, c:C.muted }, { t:p.menAge || '-', w:700, s:sz, c:C.ink },
+      { t:' · 여성 ', w:400, s:sz, c:C.muted }, { t:p.womenAge || '-', w:700, s:sz, c:C.ink },
+      { t:'년생 모집 중', w:400, s:sz, c:C.muted }], cx, cy + 58 * k, 'center');
+  }
+
+  function drawRecruit(canvas, p){
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+
+    // ticket: vertically centered on the canvas
+    const TW = 968, TH = 1402, TX = (W - TW) / 2, TY = Math.round((H - TH) / 2);
+    ctx.fillStyle = C.paper; rr(ctx, TX, TY, TW, TH, 28); ctx.fill();
+    const L = TX + 60, R = TX + TW - 60, CW = R - L;
+
+    // year / week
+    spaced(ctx, 5); font(ctx, 700, 24); ctx.fillStyle = C.bg;
+    ctx.textAlign = 'left'; ctx.fillText(String(p.year), L, TY + 80);
+    ctx.textAlign = 'right'; ctx.fillText(p.weekLabel, R, TY + 80);
+    spaced(ctx, 0);
+
+    // tagline
+    ctx.textAlign = 'left'; ctx.fillStyle = C.ink; font(ctx, 500, 27);
+    ctx.fillText('7만명이 다녀간 진짜 1등 소개팅 (네이버, 프립)', L, TY + 132);
+
+    // title: 만남살롱 + branch (강남점 blue / 홍대점 outer coral)
+    const branchColor = p.loc === '강남점' ? C.gangnam : C.bg;
+    const t1 = '만남살롱 ', t2 = p.loc;
+    let ts = 122; font(ctx, 400, ts, F_DISP);
+    while (ctx.measureText(t1 + t2).width > CW && ts > 60) { ts -= 2; font(ctx, 400, ts, F_DISP); }
+    ctx.fillStyle = C.ink; ctx.fillText(t1, L, TY + 262);
+    const w1 = ctx.measureText(t1).width;
+    ctx.fillStyle = branchColor; ctx.fillText(t2, L + w1, TY + 262);
+
+    // info box: DATE / TIME / AGE
+    const BY = TY + 300, BH = 132, colW = CW / 3;
+    ctx.lineWidth = 3; ctx.strokeStyle = C.ink; rr(ctx, L, BY, CW, BH, 14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L + colW, BY); ctx.lineTo(L + colW, BY + BH);
+    ctx.moveTo(L + colW * 2, BY); ctx.lineTo(L + colW * 2, BY + BH); ctx.stroke();
+    const label = (k, x) => { spaced(ctx, 3); font(ctx, 500, 17); ctx.fillStyle = C.muted; ctx.fillText(k, x, BY + 38); spaced(ctx, 0); };
+    [['DATE', `${p.month}/${p.day} (${p.wd})`], ['TIME', p.time]].forEach(([k, v], i) => {
+      const x = L + colW * i + 22; label(k, x);
+      ctx.fillStyle = C.ink; fitFont(ctx, v, 700, 38, F_BODY, colW - 40, 24); ctx.fillText(v, x, BY + 98);
+    });
+    const ax = L + colW * 2 + 22; label('AGE', ax);
+    [['남성', p.menAge], ['여성', p.womenAge]].forEach(([g, v], i) => {
+      const y = BY + 80 + i * 36;
+      font(ctx, 500, 26); ctx.fillStyle = C.muted; ctx.fillText(g, ax, y);
+      const gw = ctx.measureText(g).width;
+      font(ctx, 700, 30); ctx.fillStyle = C.ink; ctx.fillText(v || '-', ax + gw + 10, y);
+    });
+
+    // perforation
+    const PY = TY + 490;
+    ctx.save(); ctx.setLineDash([16, 12]); ctx.lineWidth = 4; ctx.strokeStyle = C.perf;
+    ctx.beginPath(); ctx.moveTo(TX + 44, PY); ctx.lineTo(TX + TW - 44, PY); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = C.bg;
+    ctx.beginPath(); ctx.arc(TX, PY, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(TX + TW, PY, 30, 0, Math.PI * 2); ctx.fill();
+
+    // lists
+    const gap = 48, lw = (CW - gap) / 2;
+    const cols = [
+      { x: L, title:'남성', list: slots(p.men), color: C.men },
+      { x: L + lw + gap, title:'여성', list: slots(p.women), color: C.women }
+    ];
+    const HY = PY + 76, ROW0 = HY + 22, RH = 55;
+    const noOne = !p.men.length && !p.women.length;
+    if (noOne) drawComingSoon(ctx, W / 2, (PY + ROW0 + 12 * RH + 26) / 2, p, 1);
+    if (!noOne) cols.forEach((c) => {
+      ctx.textAlign = 'left'; ctx.fillStyle = C.ink; font(ctx, 700, 34); ctx.fillText(c.title, c.x, HY);
+      ctx.fillRect(c.x, HY + 14, lw, 3);
+      c.list.forEach((s, i) => {
+        const top = ROW0 + i * RH, cy = top + RH / 2 + 2, base = top + RH / 2 + 12;
+        if (s.kind === 'p') {
+          heart(ctx, c.x, cy, 22, c.color, false);
+          font(ctx, 700, 29); const hw = ctx.measureText(s.h).width;
+          ctx.textAlign = 'right'; ctx.fillStyle = C.ink; ctx.fillText(s.h, c.x + lw, base);
+          ctx.textAlign = 'left';
+          ctx.fillText(s.age, c.x + 36, base);
+          const aw = ctx.measureText(s.age).width;
+          const room = lw - 36 - aw - 14 - hw - 14;
+          fitFont(ctx, s.job, 400, 29, F_BODY, room, 18); ctx.fillText(s.job, c.x + 36 + aw + 14, base);
+        } else {
+          const col = s.kind === 'closing' ? C.closing : C.open;
+          heart(ctx, c.x, cy, 22, col, true);
+          ctx.textAlign = 'left'; ctx.fillStyle = col; font(ctx, 600, 29);
+          ctx.fillText(s.kind === 'closing' ? '정리중' : '모집중', c.x + 36, base);
+        }
+      });
+    });
+
+    // footer: pink rectangle, original text size
+    const FY = ROW0 + 12 * RH + 26, FH = 84;
+    ctx.fillStyle = C.band; rr(ctx, L, FY, CW, FH, 10); ctx.fill();
+    const f1 = '지금도 모집중', f2 = '남은 자리는 빠르게 마감돼요';
+    font(ctx, 700, 26); const fw1 = ctx.measureText(f1).width;
+    font(ctx, 400, 26); const fw2 = ctx.measureText(f2).width;
+    const sep = 14, sx = L + (CW - (fw1 + sep + fw2)) / 2, fb = FY + FH / 2 + 9;
+    ctx.textAlign = 'left';
+    font(ctx, 700, 26); ctx.fillStyle = C.ink; ctx.fillText(f1, sx, fb);
+    font(ctx, 400, 26); ctx.fillText(f2, sx + fw1 + sep, fb);
+  }
+
+  const mode = () => (document.querySelector('input[name="mode"]:checked') || {}).value || 'recruit';
+  function draw(canvas, p){
+    return mode() === 'sold' ? drawSoldout(canvas, p, $('stampChk').checked) : drawTicket(canvas, p, false, true);
+  }
+
+  // SOLD OUT stamp: ring, fill and small text translucent; SOLD OUT solid
+  function drawStamp(ctx, cx, cy){
+    const r = 215;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.21);
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+    ctx.fillStyle = 'rgba(250,248,245,0.35)'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.globalAlpha = 0.45; ctx.strokeStyle = C.stamp;
+    ctx.lineWidth = 13; ctx.beginPath(); ctx.arc(0, 0, r - 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, r - 32, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = C.stamp; ctx.textAlign = 'center'; font(ctx, 700, 24);
+    ctx.fillText('★ 모집마감 ★', 0, -78);
+    ctx.globalAlpha = 1; ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+    ctx.fillStyle = C.stamp; font(ctx, 400, 96, F_DISP);
+    ctx.fillText('SOLD', 0, 14); ctx.fillText('OUT', 0, 106);
+    ctx.restore();
+  }
+
+  async function ensureFonts(list){
+    if (!document.fonts || !document.fonts.load) return;
+    const chars = new Set('0123456789/:() -★주차남성여성DATETIMEAGESOLDOUT만남살롱홍대점강남점7만명이다녀간진짜1등소개팅네이버프립그외참가자는현장에서만나요모집마감오전후시월화수목금토일정리중지금도남은자리빠르게돼요');
+    list.forEach((p) => [...p.men, ...p.women].forEach((s) => (s.age + s.job + s.h).split('').forEach((c) => chars.add(c))));
+    const sample = [...chars].join('');
+    const specs = ['400 40px "Black Han Sans"', '400 30px "IBM Plex Sans KR"', '500 30px "IBM Plex Sans KR"', '600 30px "IBM Plex Sans KR"', '700 30px "IBM Plex Sans KR"'];
+    try { await Promise.all(specs.map((s) => document.fonts.load(s, sample))); await document.fonts.ready; } catch (e) {}
+  }
+
+  // ---------- render / export ----------
+  function fileName(p, i){
+    const mm = String(p.month).padStart(2,'0'), dd = String(p.day).padStart(2,'0');
+    return `${String(i+1).padStart(2,'0')}_${p.year}-${mm}-${dd}_${p.hhmm}_${p.loc}${mode() === 'sold' ? '_SOLDOUT' : ''}.png`;
+  }
+
+  async function renderFrom(ws, label){
+    posters = ws ? parseSheet(ws) : [];
+    const grid = $('grid'); grid.textContent = '';
+    $('empty').style.display = posters.length ? 'none' : 'block';
+    $('zipBtn').disabled = $('eachBtn').disabled = $('mp4ZipBtn').disabled = $('mp4EachBtn').disabled = $('flipBtn').disabled = $('zip45Btn').disabled = $('each45Btn').disabled = !posters.length;
+    $('rosterBtn').disabled = !posters.length || mode() === 'sold';
+    if (!posters.length) { setStatus(`${label}에서 표를 찾지 못했어요. 표 제목이 “10/3(토) 12:20(홍대점)” 형식인지, 탭 이름이 맞는지 확인해 주세요.`, 'err'); return; }
+    await ensureFonts(posters);
+    const stamp = $('stampChk').checked;
+    posters.forEach((p, i) => {
+      const card = document.createElement('div'); card.className = 'card';
+      const cv = document.createElement('canvas'); draw(cv, p); p.canvas = cv;
+      cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', `${p.month}/${p.day} ${p.loc} 포스터 미리보기`);
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const st = document.createElement('strong'); st.textContent = `${p.month}/${p.day}(${p.wd}) ${p.time} · ${p.loc}`;
+      const sp = document.createElement('span');
+      const lim = MAX_ROWS;
+      const cut = (n) => n > lim ? `${n}명 중 ${lim}칸 표시` : `${n}명`;
+      sp.textContent = `남 ${cut(p.men.length)} · 여 ${cut(p.women.length)} · ${p.weekLabel}`;
+      meta.append(st, sp);
+      if (p.odd.length) {
+        const f = document.createElement('span'); f.className = 'flag';
+        f.textContent = `확인 필요: ${p.odd.join(', ')}`; meta.append(f);
+      }
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = 'PNG 저장';
+      b.addEventListener('click', () => saveOne(i));
+      const vb = document.createElement('button'); vb.type = 'button'; vb.className = 'ghost'; vb.textContent = '10초 영상(MP4) 저장';
+      vb.addEventListener('click', () => saveVideo(i, vb));
+      meta.append(b, vb); card.append(cv, meta); grid.append(card);
+    });
+    renderRosterPreview();
+    setStatus(`${label}에서 표 ${posters.length}개를 찾았어요. 포스터 ${posters.length}장이 준비됐습니다.`, 'ok');
+  }
+
+  function rerender(){
+    if (!posters.length) return;
+    posters.forEach((p) => draw(p.canvas, p));
+  }
+  $('stampChk').addEventListener('change', rerender);
+
+  // ---------- 포스터 종류(모집중 / 솔드아웃) ----------
+  let lastSource = null;
+  const TABS = { recruit: '인스타', sold: '인스타완료' };
+  const defaultTab = () => TABS[mode()];
+  function syncModeUi(){
+    const sold = mode() === 'sold';
+    $('stampChk').disabled = !sold; $('stampRow').style.opacity = sold ? '1' : '.45';
+    $('rosterBtn').hidden = sold; if (sold) $('rosterWrap').hidden = true;
+    $('ruleNote').textContent = sold
+      ? '솔드아웃: 남녀 각각 최대 15명 표시, 아래에 ⋮ 와 모집마감 박스. ‘신청 가능 / 모집 중 / 정리중’ 칸은 자동으로 빠집니다.'
+      : '모집중: 솔드아웃과 같은 디자인. 남녀 각각 최대 15칸, 빈자리는 ♡ 모집중으로 표시하고 아래에 남은 자리 수를 보여줍니다. 참가자가 없으면 ‘수요일 공개예정’.';
+  }
+  document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener('change', () => {
+    const t = $('tabName').value.trim();
+    if (!t || Object.values(TABS).includes(t)) $('tabName').value = defaultTab();
+    syncModeUi();
+    if (lastSource === 'xlsx' && workbook) {
+      const sel = $('sheetSel'); const want = $('tabName').value.trim();
+      if (workbook.SheetNames.includes(want)) sel.value = want;
+      renderFrom(workbook.Sheets[sel.value], `‘${sel.value}’ 탭`);
+    } else if (lastSource === 'google') {
+      $('loadBtn').click();
+    }
+  }));
+  syncModeUi();
+
+
+  const toBlob = (cv) => new Promise((res) => cv.toBlob(res, 'image/png'));
+  function download(filename, blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  async function saveOne(i){
+    const p = posters[i]; download(fileName(p, i), await toBlob(p.canvas));
+    setStatus(`${fileName(p, i)} 저장 완료`, 'ok');
+  }
+
+  // ---------- 10초 MP4 영상 (Instagram Reels용, H.264 · 1080×1920 · 30fps · 무음) ----------
+  const VIDEO_SEC = 10, FPS = 30;
+  const videoName = (p, i) => fileName(p, i).replace(/\.png$/i, '.mp4');
+  async function pickCodec(w, h){
+    if (!('VideoEncoder' in window) || !window.Mp4Muxer) return null;
+    for (const codec of ['avc1.640028', 'avc1.4d0028', 'avc1.42e028', 'avc1.640033']) {
+      const c = { codec, width: w, height: h, bitrate: 6_000_000, framerate: FPS };
+      try { const r = await VideoEncoder.isConfigSupported(c); if (r && r.supported) return c; } catch (e) {}
+    }
+    return null;
+  }
+  async function makeVideo(canvas){
+    const config = await pickCodec(canvas.width, canvas.height);
+    if (!config) throw new Error('nosupport');
+    const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(),
+      video: { codec: 'avc', width: canvas.width, height: canvas.height }, fastStart: 'in-memory' });
+    let failed = null;
+    const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failed = e; } });
+    enc.configure(config);
+    const total = VIDEO_SEC * FPS, dur = 1e6 / FPS;
+    for (let f = 0; f < total; f++) {
+      if (failed) throw failed;
+      const frame = new VideoFrame(canvas, { timestamp: Math.round(f * dur), duration: Math.round(dur) });
+      enc.encode(frame, { keyFrame: f % FPS === 0 });
+      frame.close();
+      while (enc.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 4));
+    }
+    await enc.flush(); enc.close();
+    if (failed) throw failed;
+    muxer.finalize();
+    return new Blob([muxer.target.buffer], { type: 'video/mp4' });
+  }
+  const videoError = (e) => (e && e.message === 'nosupport')
+    ? '이 브라우저는 영상 만들기를 지원하지 않아요. 최신 크롬(또는 엣지)에서 열어주세요.'
+    : '영상을 만들지 못했어요: ' + ((e && e.message) || e);
+  async function saveVideo(i, btn){
+    const p = posters[i]; if (btn) btn.disabled = true;
+    setStatus(`${videoName(p, i)} 만드는 중…`);
+    try { const blob = await makeVideo(p.canvas); await download(videoName(p, i), blob); setStatus(`${videoName(p, i)} 저장 완료`, 'ok'); }
+    catch (e) { setStatus(videoError(e), 'err'); }
+    finally { if (btn) btn.disabled = false; }
+  }
+  $('mp4ZipBtn').addEventListener('click', async () => {
+    if (!posters.length) return;
+    $('mp4ZipBtn').disabled = true;
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < posters.length; i++) {
+        setStatus(`영상 만드는 중… (${i + 1}/${posters.length})`);
+        zip.file(videoName(posters[i], i), await makeVideo(posters[i].canvas));
+      }
+      setStatus('영상을 묶는 중…');
+      const d = new Date(); const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      await download(`만남살롱_${mode() === 'sold' ? '솔드아웃' : '모집중'}_영상_${ymd}_${posters.length}개.zip`, await zip.generateAsync({ type: 'blob' }));
+      setStatus(`10초 영상 ${posters.length}개를 ZIP으로 저장했어요.`, 'ok');
+    } catch (e) { setStatus(videoError(e), 'err'); }
+    finally { $('mp4ZipBtn').disabled = false; }
+  });
+
+  // ---------- 전체 30초통합(MP4): 최신 날짜순, 책장 넘기기 전환 ----------
+  const FLIP_SEC = 30;
+  const sortKey = (p) => p.year * 1e8 + p.month * 1e6 + p.day * 1e4 + parseInt(p.hhmm, 10);
+  // 현재 장을 왼쪽 가장자리(책등)를 축으로 넘겨 다음 장을 드러낸다. t: 0→1
+  function drawPageTurn(ctx, cur, next, t){
+    const w = cur.width, h = cur.height;
+    ctx.drawImage(next, 0, 0);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease-in-out
+    const theta = e * Math.PI * 0.62;                                    // ~112°에서 사라짐
+    const cos = Math.cos(theta), sin = Math.sin(theta);
+    // 넘어가는 장이 드리우는 그림자
+    const reach = Math.max(0, w * cos) + 60 + 260 * sin;
+    const sh = ctx.createLinearGradient(0, 0, reach, 0);
+    sh.addColorStop(0, `rgba(0,0,0,${0.32 * Math.sin(e * Math.PI)})`); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh; ctx.fillRect(0, 0, reach, h);
+    if (cos <= 0.002) return;                                            // 장이 완전히 넘어감
+    const persp = 2600, strips = 120, sw = w / strips;
+    for (let k = 0; k < strips; k++) {
+      const u0 = k * sw, u1 = u0 + sw;
+      const s0 = persp / (persp + u0 * sin), s1 = persp / (persp + u1 * sin);
+      const x0 = u0 * cos * s0, x1 = u1 * cos * s1;
+      const hh = h * s1, y = (h - hh) / 2;
+      ctx.drawImage(cur, u0, 0, sw, h, x0, y, Math.max(1, x1 - x0 + 0.6), hh);
+    }
+    // 넘어가는 장의 음영(기울수록 어두워짐) + 접히는 끝 하이라이트
+    const pw = w * cos;
+    const g = ctx.createLinearGradient(0, 0, pw, 0);
+    g.addColorStop(0, `rgba(0,0,0,${0.05 * sin})`);
+    g.addColorStop(0.85, `rgba(0,0,0,${0.28 * sin})`);
+    g.addColorStop(1, `rgba(255,255,255,${0.18 * sin})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, pw, h);
+  }
+  async function makeFlipVideo(list){
+    const w = list[0].width, h = list[0].height;
+    const config = await pickCodec(w, h);
+    if (!config) throw new Error('nosupport');
+    const work = document.createElement('canvas'); work.width = w; work.height = h;
+    const ctx = work.getContext('2d');
+    const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(),
+      video: { codec: 'avc', width: w, height: h }, fastStart: 'in-memory' });
+    let failed = null;
+    const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failed = e; } });
+    enc.configure(config);
+    const total = FLIP_SEC * FPS, dur = 1e6 / FPS, n = list.length;
+    const seg = total / n;                                   // 장당 프레임 수
+    const turn = Math.min(Math.round(FPS * 0.9), Math.floor(seg * 0.45));   // 넘김 프레임 수
+    for (let f = 0; f < total; f++) {
+      if (failed) throw failed;
+      const idx = Math.min(n - 1, Math.floor(f / seg));
+      const local = f - idx * seg, start = seg - turn;
+      if (idx < n - 1 && turn > 1 && local >= start) drawPageTurn(ctx, list[idx], list[idx + 1], (local - start) / turn);
+      else ctx.drawImage(list[idx], 0, 0);
+      const frame = new VideoFrame(work, { timestamp: Math.round(f * dur), duration: Math.round(dur) });
+      enc.encode(frame, { keyFrame: f % FPS === 0 });
+      frame.close();
+      if (f % 30 === 0) setStatus(`30초통합 영상 만드는 중… ${Math.round(f / total * 100)}%`);
+      while (enc.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 4));
+    }
+    await enc.flush(); enc.close();
+    if (failed) throw failed;
+    muxer.finalize();
+    return new Blob([muxer.target.buffer], { type: 'video/mp4' });
+  }
+  $('flipBtn').addEventListener('click', async () => {
+    if (!posters.length) return;
+    $('flipBtn').disabled = true;
+    try {
+      const ordered = posters.slice().sort((a, b) => sortKey(b) - sortKey(a));
+      const blob = await makeFlipVideo(ordered.map((p) => p.canvas));
+      const d = new Date(); const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      const name = `만남살롱_${mode() === 'sold' ? '솔드아웃' : '모집중'}_30초통합_${ymd}.mp4`;
+      await download(name, blob);
+      setStatus(`${name} 저장 완료 (포스터 ${ordered.length}장, 최신 날짜순)`, 'ok');
+    } catch (e) { setStatus(videoError(e), 'err'); }
+    finally { $('flipBtn').disabled = false; }
+  });
+
+  // ---------- 참가자명단 (본문용 긴 이미지, 860px 기준 ×1.5) ----------
+  const RS = 1.5, RW = 860;
+  const floor10 = (d) => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getMinutes() % 10, 0, 0); return x; };
+  function updLabel(){
+    const d = floor10(new Date()), z = (n) => String(n).padStart(2, '0');
+    return `업데이트 일시 ${d.getFullYear()}.${z(d.getMonth()+1)}.${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`;
+  }
+  function rosterRows(p, side){
+    const ppl = side === 'm' ? p.men : p.women;
+    const close = side === 'm' ? p.menClose : p.womenClose, open = side === 'm' ? p.menOpen : p.womenOpen;
+    return [...ppl.map((q) => ({ kind:'p', ...q })), ...Array(close).fill({ kind:'closing' }), ...Array(open).fill({ kind:'open' })];
+  }
+  function rosterCardHeight(p){
+    if (!p.men.length && !p.women.length) return 22 + 40 + 6 + 24 + 14 + 3 + 12 + 137 + 18;
+    const n = Math.max(rosterRows(p, 'm').length, rosterRows(p, 'w').length);
+    return 22 + 40 + 6 + 24 + 14 + 3 + 12 + 34 + n * 28 + 14 + 42 + 18;
+  }
+  function drawRosterCard(ctx, p, x, y, w, h){
+    ctx.fillStyle = C.paper; rr(ctx, x, y, w, h, 18); ctx.fill();
+    const L = x + 18, R = x + w - 18, iw = R - L;
+    // 날짜·시간 + 지점
+    let yy = y + 22 + 31;
+    ctx.textAlign = 'left'; ctx.fillStyle = C.ink; font(ctx, 400, 31, F_DISP);
+    const head = `${p.month}/${p.day} (${p.wd}) ${p.hhmm.slice(0,2)}:${p.hhmm.slice(2)}`;
+    ctx.fillText(head, L, yy);
+    const hw = ctx.measureText(head).width;
+    ctx.fillStyle = p.loc === '강남점' ? C.gangnam : C.bg; font(ctx, 400, 25, F_DISP); ctx.fillText(p.loc, L + hw + 8, yy);
+    // 나이
+    yy = y + 22 + 40 + 6 + 18;
+    richText(ctx, [{ t:'남성 ', w:400, s:17, c:C.muted }, { t:p.menAge || '-', w:700, s:17, c:C.ink },
+      { t:' · 여성 ', w:400, s:17, c:C.muted }, { t:p.womenAge || '-', w:700, s:17, c:C.ink }, { t:'년생', w:400, s:17, c:C.muted }], L, yy, 'left');
+    // 절취선
+    const py = y + 22 + 40 + 6 + 24 + 14;
+    ctx.save(); ctx.setLineDash([6, 5]); ctx.lineWidth = 3; ctx.strokeStyle = C.perf;
+    ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x + w, py); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = C.bg; ctx.beginPath(); ctx.arc(x, py, 12, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x + w, py, 12, 0, Math.PI*2); ctx.fill();
+    const top = py + 3 + 12;
+    if (!p.men.length && !p.women.length) {
+      ctx.textAlign = 'center'; ctx.fillStyle = C.ink; font(ctx, 400, 34, F_DISP); ctx.fillText('수요일 공개예정', x + w / 2, top + 36 + 34);
+      richText(ctx, [{ t:'남성 ', w:400, s:17, c:C.muted }, { t:p.menAge || '-', w:700, s:17, c:C.ink },
+        { t:' · 여성 ', w:400, s:17, c:C.muted }, { t:p.womenAge || '-', w:700, s:17, c:C.ink }, { t:'년생 모집 중', w:400, s:17, c:C.muted }],
+        x + w / 2, top + 36 + 44 + 6 + 18, 'center');
+      return;
+    }
+    const cw = (iw - 12) / 2;
+    [['남성', 'm', C.men, L], ['여성', 'w', C.women, L + cw + 12]].forEach(([t, side, col, cx]) => {
+      ctx.textAlign = 'left'; ctx.fillStyle = C.ink; font(ctx, 700, 17); ctx.fillText(t, cx, top + 18);
+      ctx.fillRect(cx, top + 28, cw, 2);
+      rosterRows(p, side).forEach((r, i) => {
+        const ry = top + 34 + i * 28, base = ry + 19, mid = ry + 14;
+        if (r.kind === 'p') {
+          heart(ctx, cx, mid, 17, col, false);
+          font(ctx, 700, 16); ctx.fillStyle = C.ink; ctx.textAlign = 'right'; ctx.fillText(r.h, cx + cw, base);
+          const hw2 = ctx.measureText(r.h).width;
+          ctx.textAlign = 'left'; ctx.fillText(r.age, cx + 22, base);
+          const aw = ctx.measureText(r.age).width;
+          fitFont(ctx, r.job, 400, 16, F_BODY, cw - 22 - aw - 5 - hw2 - 6, 11); ctx.fillText(r.job, cx + 22 + aw + 5, base);
+        } else {
+          const c2 = r.kind === 'closing' ? C.closing : col;
+          heart(ctx, cx, mid, 17, c2, true);
+          ctx.textAlign = 'left'; ctx.fillStyle = c2; font(ctx, 600, 16); ctx.fillText(r.kind === 'closing' ? '정리중' : '모집중', cx + 22, base);
+        }
+      });
+    });
+    const n = Math.max(rosterRows(p, 'm').length, rosterRows(p, 'w').length);
+    const fy = top + 34 + n * 28 + 14;
+    ctx.fillStyle = C.band; rr(ctx, L, fy, iw, 42, 10); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = C.ink; font(ctx, 500, 16);
+    ctx.fillText(`남 ${p.menOpen}자리 · 여 ${p.womenOpen}자리 남음`, x + w / 2, fy + 27);
+  }
+  function drawRoster(canvas, list){
+    const ordered = list.slice().sort((a, b) => sortKey(a) - sortKey(b));
+    const gridTop = 205, gap = 16, cw = (RW - 44 - gap) / 2;
+    let y = gridTop; const rows = [];
+    for (let i = 0; i < ordered.length; i += 2) {
+      const pair = ordered.slice(i, i + 2), h = Math.max(...pair.map(rosterCardHeight));
+      rows.push({ pair, y, h }); y += h + gap;
+    }
+    const total = y - gap + 24 + 25 + 44;
+    canvas.width = Math.round(RW * RS); canvas.height = Math.round(total * RS);
+    const ctx = canvas.getContext('2d'); ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, RW, total);
+    ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'left'; font(ctx, 500, 16); ctx.fillText(updLabel(), 22, 28 + 16);
+    ctx.textAlign = 'center'; ctx.globalAlpha = 0.95; font(ctx, 400, 20); ctx.fillText('7만명이 다녀간 진짜 1등 소개팅', RW / 2, 68 + 21); ctx.globalAlpha = 1;
+    font(ctx, 400, 60, F_DISP); ctx.fillText('이번 주 참가자 현황', RW / 2, 96 + 6 + 60);
+    rows.forEach((r) => r.pair.forEach((p, k) => drawRosterCard(ctx, p, 22 + k * (cw + gap), r.y, cw, r.h)));
+    ctx.textAlign = 'center'; ctx.fillStyle = '#FFFFFF'; ctx.globalAlpha = 0.9; font(ctx, 400, 17);
+    ctx.fillText('참여 인원은 성비에 따라 증가됩니다.', RW / 2, y - gap + 24 + 18); ctx.globalAlpha = 1;
+    return canvas;
+  }
+  function renderRosterPreview(){
+    const show = mode() !== 'sold' && posters.length;
+    $('rosterWrap').hidden = !show;
+    if (show) drawRoster($('rosterCv'), posters);
+  }
+  $('rosterBtn').addEventListener('click', async () => {
+    if (!posters.length) return;
+    const cv = drawRoster(document.createElement('canvas'), posters);
+    const d = floor10(new Date()), z = (n) => String(n).padStart(2, '0');
+    const name = `만남살롱_참가자명단_${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}.png`;
+    download(name, await toBlob(cv));
+    setStatus(`${name} 저장 완료 (회차 ${posters.length}개)`, 'ok');
+  });
+  $('mp4EachBtn').addEventListener('click', async () => {
+    $('mp4EachBtn').disabled = true;
+    try {
+      for (let i = 0; i < posters.length; i++) {
+        setStatus(`영상 만드는 중… (${i + 1}/${posters.length})`);
+        await download(videoName(posters[i], i), await makeVideo(posters[i].canvas));
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      setStatus(`10초 영상 ${posters.length}개 저장 완료`, 'ok');
+    } catch (e) { setStatus(videoError(e), 'err'); }
+    finally { $('mp4EachBtn').disabled = false; }
+  });
+
+  $('zipBtn').addEventListener('click', async () => {
+    if (!posters.length) return;
+    $('zipBtn').disabled = true; setStatus('PNG를 묶는 중…');
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < posters.length; i++) zip.file(fileName(posters[i], i), await toBlob(posters[i].canvas));
+      const d = new Date(); const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      download(`만남살롱_${mode() === 'sold' ? '솔드아웃' : '모집중'}_${stamp}_${posters.length}장.zip`, await zip.generateAsync({ type:'blob' }));
+      setStatus(`PNG ${posters.length}장을 ZIP으로 저장했어요.`, 'ok');
+    } finally { $('zipBtn').disabled = false; }
+  });
+  $('eachBtn').addEventListener('click', async () => {
+    for (let i = 0; i < posters.length; i++) {
+      download(fileName(posters[i], i), await toBlob(posters[i].canvas));
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    setStatus(`PNG ${posters.length}장 저장 완료`, 'ok');
+  });
+
+  // ---------- 1080×1350 (인스타 피드 4:5) ----------
+  // 1080×1920 포스터를 티켓이 위아래 여백 안에 들어오도록 줄여 가운데 배치 (바깥은 같은 코랄 배경)
+  const FW = 1080, FH = 1350;
+  // 바깥 여백을 상하좌우 44px로 같게 하고, 티켓(992×1262)에 맞춰 세로 간격·글자를 비율대로 다시 그림
+  const FEED_GEO = { W: FW, H: FH, TW: FW - 88, TH: FH - 88 };
+  function toFeed(p){
+    const c = document.createElement('canvas');
+    if (mode() === 'sold') drawTicket(c, p, $('stampChk').checked, false, FEED_GEO);
+    else drawTicket(c, p, false, true, FEED_GEO);
+    return c;
+  }
+  const feedName = (p, i) => fileName(p, i).replace(/\.png$/i, '_1080x1350.png');
+  $('zip45Btn').addEventListener('click', async () => {
+    if (!posters.length) return;
+    $('zip45Btn').disabled = true; setStatus('1080×1350 PNG를 묶는 중…');
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < posters.length; i++) zip.file(feedName(posters[i], i), await toBlob(toFeed(posters[i])));
+      const d = new Date(); const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      download(`만남살롱_${mode() === 'sold' ? '솔드아웃' : '모집중'}_1080x1350_${stamp}_${posters.length}장.zip`, await zip.generateAsync({ type:'blob' }));
+      setStatus(`1080×1350 PNG ${posters.length}장을 ZIP으로 저장했어요.`, 'ok');
+    } finally { $('zip45Btn').disabled = false; }
+  });
+  $('each45Btn').addEventListener('click', async () => {
+    for (let i = 0; i < posters.length; i++) {
+      download(feedName(posters[i], i), await toBlob(toFeed(posters[i])));
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    setStatus(`1080×1350 PNG ${posters.length}장 저장 완료`, 'ok');
+  });
+
+  // ---------- loading ----------
+  $('loadBtn').addEventListener('click', async () => {
+    const url = $('sheetUrl').value;
+    const id = fileIdFrom(url);
+    if (!id) { setStatus('시트 주소에서 파일 ID를 찾지 못했어요. 주소를 다시 확인해 주세요.', 'err'); return; }
+    const tab = ($('tabName').value || '').trim();
+    const gid = (url.match(/[#&?]gid=(\d+)/) || [])[1];
+    const q = tab ? `&sheet=${encodeURIComponent(tab)}` : (gid ? `&gid=${gid}` : '');
+    const label = tab ? `‘${tab}’ 탭` : (gid ? `gid ${gid} 탭` : '첫 번째 탭');
+    if (inFrame) {
+      setStatus('지금은 Claude 앱 안의 미리보기 화면이라 인터넷 접속이 막혀 있어요. 파일을 다운로드한 뒤 크롬에서 직접 열어 사용해 주세요.', 'err'); return;
+    }
+    $('loadBtn').disabled = true; setStatus(`${label}을 읽는 중…`);
+    const base = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?headers=0${q}`;
+    const problems = [];
+    try {
+      // 1st try: CSV via fetch
+      try {
+        const r = await fetch(`${base}&tqx=out:csv`, { credentials:'omit' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const text = await r.text();
+        if (!text.trim() || /^\s*</.test(text)) throw new Error('비공개 응답');
+        const wb = XLSX.read(text, { type:'string', raw:true });
+        lastSource = 'google'; await renderFrom(wb.Sheets[wb.SheetNames[0]], label); return;
+      } catch (e) { problems.push('CSV: ' + (e.message || e)); }
+      // 2nd try: script-tag (JSONP) — works even when the browser blocks cross-site fetch
+      try {
+        const rows = await loadViaScript(base);
+        lastSource = 'google'; await renderFrom(XLSX.utils.aoa_to_sheet(rows), label); return;
+      } catch (e) { problems.push('JSONP: ' + (e.message || e)); }
+      const why = problems.join(' / ');
+      let msg = '구글 시트를 읽지 못했어요. ';
+      if (/access|denied|login|비공개/i.test(why)) msg += '시트 공유가 ‘링크가 있는 모든 사용자’로 되어 있는지 확인해 주세요. ';
+      else if (/sheet|탭/i.test(why)) msg += `‘${tab}’ 탭 이름이 시트와 똑같은지 확인해 주세요. `;
+      else msg += '인터넷 연결이나 회사 보안 프로그램·광고 차단 확장이 구글을 막고 있는지 확인해 주세요. ';
+      setStatus(msg + '안 되면 시트를 .xlsx로 내려받아 올려주세요. [자세한 원인: ' + why + ']', 'err');
+    } finally { $('loadBtn').disabled = false; }
+  });
+
+  const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+
+  function loadViaScript(base){
+    return new Promise((resolve, reject) => {
+      const cb = '__mannamCb' + Date.now();
+      const s = document.createElement('script');
+      const done = (fn, v) => { clearTimeout(timer); delete window[cb]; s.remove(); fn(v); };
+      const timer = setTimeout(() => done(reject, new Error('응답 없음(시간 초과)')), 15000);
+      window[cb] = (res) => {
+        if (!res || res.status === 'error') {
+          const e = (res && res.errors && res.errors[0]) || {};
+          return done(reject, new Error(`${e.reason || 'error'} ${e.detailed_message || e.message || ''}`.trim()));
+        }
+        const rows = (res.table.rows || []).map((r) => (r.c || []).map((c) => (c && c.v != null) ? String(c.f != null ? c.f : c.v) : ''));
+        done(resolve, rows);
+      };
+      s.onerror = () => done(reject, new Error('스크립트 로드 실패'));
+      s.src = `${base}&tqx=out:json;responseHandler:${cb}`;
+      document.head.append(s);
+    });
+  }
+
+  function useWorkbook(wb, name){
+    workbook = wb; lastSource = 'xlsx';
+    const sel = $('sheetSel'); sel.textContent = '';
+    wb.SheetNames.forEach((n) => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.append(o); });
+    const want = ($('tabName').value || defaultTab()).trim();
+    sel.value = wb.SheetNames.find((n) => n === want) || wb.SheetNames.find((n) => n.includes('인스타')) || wb.SheetNames[0];
+    sel.disabled = false;
+    renderFrom(wb.Sheets[sel.value], `‘${name}’의 ‘${sel.value}’ 탭`);
+  }
+  $('sheetSel').addEventListener('change', () => {
+    if (workbook) renderFrom(workbook.Sheets[$('sheetSel').value], `‘${$('sheetSel').value}’ 탭`);
+  });
+  $('xlsxFile').addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    try { useWorkbook(XLSX.read(await f.arrayBuffer(), { type:'array' }), f.name); }
+    catch (e) { setStatus('엑셀 파일을 읽지 못했어요. .xlsx 파일이 맞는지 확인해 주세요.', 'err'); }
+  });
+})();
+</script>
+</body>
+</html>
