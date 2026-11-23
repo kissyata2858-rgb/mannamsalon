@@ -6613,7 +6613,11 @@ body.mr-dragging,body.mr-dragging *{cursor:grabbing!important;user-select:none}
   async function invoke(body){
     const sb = cloud(); if (!sb) return { ok: false, error: '어드민에 로그인해야 보낼 수 있어요 (로그인 없이 사용 중)' };
     try { const { data, error } = await sb.functions.invoke('solapi', { body });
-      if (error){ let msg = error.message; try { const j = await error.context.json(); msg = j.error || msg; } catch(e){} return { ok: false, error: msg }; }
+      if (error){ let msg = error.message, code = error.context && error.context.status;
+        try { const t = await error.context.text(); let j = null; try { j = JSON.parse(t); } catch(_){}
+          msg = (j && (j.error || j.message || j.msg)) || (t && t.slice(0, 160)) || msg; } catch(e){}
+        const hint = code === 404 ? ' → Supabase에 solapi 함수가 아직 배포되지 않았어요 (이름 확인)' : code === 401 && /jwt/i.test(msg) ? ' → 함수 설정에서 Verify JWT(Enforce JWT)를 끄고 다시 시도해 주세요' : code === 500 ? ' → Supabase 함수 Logs를 확인해 주세요' : '';
+        return { ok: false, error: (code ? '[' + code + '] ' : '') + msg + hint }; }
       return data || { ok: false, error: '응답 없음' };
     } catch(e){ return { ok: false, error: String(e && e.message || e) }; }
   }
