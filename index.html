@@ -365,6 +365,10 @@ tr:last-child td{border-bottom:0}
 .banner .btn{padding:6px 12px;font-size:12.5px;margin-left:auto}
 #view-orders .kpi strong{margin-top:8px;font-size:24px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;padding:18px 22px}
+.autobar{display:flex;gap:8px 18px;flex-wrap:wrap;align-items:center;padding:12px 22px;border-bottom:1px solid var(--line,#e6e8ef);font-size:13px;background:var(--accent-soft,#f3f6ff)}
+.autobar .ag{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.autobar b{font-size:13px}.autobar select,.autobar input{padding:5px 8px;font-size:13px}
+.autobar input[type=time]{width:96px}.autobar input[type=number]{width:58px}.autobar .alog{flex-basis:100%;color:var(--muted,#7a8396);font-size:12px;line-height:1.5}
+.autobar .alog i{font-style:normal;margin-right:10px}.autobar .alog .bad{color:var(--bad)}
 .filters input,.filters select{font:inherit;font-size:13.5px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 .filters input{flex:1 1 240px;min-width:0}
 .oconf{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:12px;padding:18px 22px;margin-bottom:20px;align-items:end}
@@ -894,6 +898,17 @@ span.cell-sel{display:inline-block;cursor:default}
         <div class="card kpi"><span class="l">취소 · 블랙리스트</span><strong id="oCancel">-</strong></div>
       </div>
       <div class="card" style="margin-top:20px">
+        <div class="autobar" id="oAutoBar" title="서버(Supabase auto-jobs)가 1분마다 실행해요. 어드민을 닫아 둬도 돌아가요.">
+          <div class="ag"><b>⚡ 프립 자동승인</b>
+            <select id="aFripMode" aria-label="프립 자동승인"><option value="off">끄기</option><option value="on">켜기</option><option value="dry">리허설</option></select>
+            <input type="time" id="aFripFrom" value="10:00" aria-label="자동승인 시작 시각"> ~ <input type="time" id="aFripTo" value="22:00" aria-label="자동승인 끝 시각">
+            <select id="aFripWho" aria-label="자동승인 대상"><option value="women">여자만</option><option value="all">남녀 모두</option></select>
+            <span title="진행일정 상태에 x(블랙 포함)가 있는 사람, 블랙리스트, 메모에 '취소', 그 날짜 데이터미포함 인원은 승인하지 않아요">· 상태x 제외</span></div>
+          <div class="ag"><b>🚚 자사몰 자동 배송중</b>
+            <select id="aShipOn" aria-label="자사몰 자동 배송중"><option value="off">끄기</option><option value="on">켜기</option></select>
+            결제 <input type="number" id="aShipMin" min="1" max="1440" value="30" aria-label="배송중 전환까지 분"> 분 뒤 · 1건씩</div>
+          <div class="alog" id="aLog">서버 자동화 연결 확인 중…</div>
+        </div>
         <div class="filters">
           <input id="oSearch" type="search" placeholder="나이(2자리) · 끝번호(4자리) · 닉네임·이름·직장·행사 — 예: 95 1838" aria-label="주문 검색">
           <select id="oPlat" aria-label="플랫폼"><option value="">플랫폼 전체</option><option>자사몰</option><option>프립</option><option>문토</option></select>
@@ -2042,7 +2057,7 @@ window.MannamCalendarMaker={refresh:()=>{renderStepper();fitPreviews();}};
       <td class="${o.gender === '남' ? 'g-m' : 'g-f'}">${esc(o.gender)}</td><td>${esc(o.age)}</td>
       <td>${esc(nickLbl(o))}</td><td><b>${esc(o.name)}</b>${o.memo ? ` <span class="memo" title="${esc(o.memo)}">요청</span>` : ''}</td>
       <td class="job" title="${esc(o.job)}">${esc(o.job)}</td><td>${esc(o.height)}</td><td class="ev-c" title="${esc(o.event)}">${esc(o.event)}</td>
-      <td>${o.munto && o.muntoWait ? `<span class="cell-sel st-대기중" title="문토 승인 대기 (수락·거절 전)${o.expAt ? ' · 대기취소 예정 ' + esc(new Date(o.expAt).toLocaleString('ko-KR')) : ''}">대기중</span>` : o.munto ? (o.stat === '취소' ? `<span class="cell-sel st-취소" title="문토에서 취소·내보내기됨">취소</span>` : `<span class="cell-sel st-확정" title="문토 승인 멤버 · 신청 ${esc(o.time)}${o.early ? ' · 선착순 15% 할인' : ''}">확정</span>`) : isFrip(o) ? (o.stat === '대기중' ? sel(i, 'fripstat', ['대기중','확정'], o.stat, 'st-' + o.stat) : `<span class="cell-sel st-${o.stat}" title="프립 예약 상태가 자동 반영돼요">${o.stat}</span>`) : sel(i, 'stat', ['대기중','확정','취소'], o.stat, 'st-' + o.stat)}${fripBadge(o)}</td>
+      <td>${o.munto && o.muntoWait ? `<span class="cell-sel st-대기중" title="문토 승인 대기 (수락·거절 전)${o.expAt ? ' · 대기취소 예정 ' + esc(new Date(o.expAt).toLocaleString('ko-KR')) : ''}">대기중</span>` : o.munto ? (o.stat === '취소' ? `<span class="cell-sel st-취소" title="문토에서 취소·내보내기됨">취소</span>` : `<span class="cell-sel st-확정" title="문토 승인 멤버 · 신청 ${esc(o.time)}${o.early ? ' · 선착순 15% 할인' : ''}">확정</span>`) : isFrip(o) ? (o.stat === '대기중' ? sel(i, 'fripstat', ['대기중','확정'], o.stat, 'st-' + o.stat) : `<span class="cell-sel st-${o.stat}" title="프립 예약 상태가 자동 반영돼요">${o.stat}</span>`) : sel(i, 'stat', ['대기중','확정','취소'], o.stat, 'st-' + o.stat)}${fripBadge(o)}${autoBadge(o)}</td>
       <td class="mono">${esc(o.phone)}</td>
       <td>${stCell(o)}</td>
       <td>${o.munto ? '' : twoCell(o, i)}</td></tr>`).join('')
@@ -2156,6 +2171,79 @@ window.MannamCalendarMaker={refresh:()=>{renderStepper();fitPreviews();}};
       if (fripQ.length){ if (fripDirty){ fripWin = window.open('https://frip.host/booking', 'mn_frip_confirm'); fripDirty = false; } }
     }
   }
+
+  /* ---------- 주문 자동화 (서버 auto-jobs · 1분마다) : 프립 자동승인 시간대 · 자사몰 결제 N분 뒤 배송중 ----------
+     설정은 Supabase auto_settings 표에 저장돼 두 관리자가 같이 써요. 처리 기록은 auto_log 표 */
+  var autoLog = new Map(), autoCfg = {}, autoReady = false, autoPushSig = "";
+  const asb = () => { try { return window.__cloud && window.__cloud.user && window.__cloud.user() && window.__cloud.client(); } catch(e){ return null; } };
+  function autoBadge(o){
+    const id = String(o.id || ''); let l = null, k = '';
+    if (/^FRIP-/.test(id)){ l = autoLog.get('frip:' + id); k = 'frip'; }
+    else { const m = id.match(/^IMWEB-(\d+)/); if (m){ l = autoLog.get('imweb:' + m[1]); k = 'imweb'; } }
+    if (!l || l.skip) return '';
+    if (l.ok == null) return ` <span class="fbadge wait" title="${esc(l.msg || '')}">자동…</span>`;
+    const t = k === 'frip' ? (l.ok ? (l.dry ? '자동 리허설' : '자동승인✓') : '자동승인⚠') : (l.ok ? '배송중✓' : '배송중⚠');
+    return ` <span class="fbadge ${l.ok ? (l.dry ? 'dry' : 'ok') : 'bad'}" title="${esc(l.msg || '')}">${t}</span>`;
+  }
+  const aEl = (id) => document.getElementById(id);
+  function autoFill(){
+    const f = autoCfg.frip_auto || {}, s = autoCfg.imweb_ship || {};
+    aEl('aFripMode').value = f.mode || 'off'; aEl('aFripFrom').value = f.from || '10:00'; aEl('aFripTo').value = f.to || '22:00'; aEl('aFripWho').value = f.women === false ? 'all' : 'women';
+    aEl('aShipOn').value = s.on ? 'on' : 'off'; aEl('aShipMin').value = s.delayMin || 30;
+  }
+  function autoLogLine(){
+    const el = aEl('aLog'); if (!el) return;
+    if (!autoReady){ return; }
+    const lr = autoCfg.last_run || {}, at = lr.at ? new Date(lr.at) : null;
+    const ago = at ? Math.round((Date.now() - at) / 60000) : null;
+    const head = at ? (ago > 5 ? `<i class="bad">⚠️ 서버 자동화가 ${ago}분째 실행되지 않았어요 (auto-jobs 1분 자동 실행 확인)</i>` : `<i>마지막 실행 ${at.getHours()}:${String(at.getMinutes()).padStart(2, '0')}</i>`) : '<i class="bad">⚠️ 아직 서버 자동화가 한 번도 실행되지 않았어요 (auto-jobs 함수 · 1분 자동 실행 설정 필요)</i>';
+    const fr = lr.frip && typeof lr.frip === 'object' ? (lr.frip.error ? `<i class="bad">프립: ${esc(lr.frip.error)}</i>` : `<i>프립 대상 ${lr.frip.candidates || 0}명${lr.frip.waiting ? ` · 대기 ${lr.frip.waiting}` : ''}</i>`) : (lr.frip ? `<i>프립: ${esc(lr.frip)}</i>` : '');
+    const im = lr.imweb && lr.imweb.error ? `<i class="bad">자사몰: ${esc(lr.imweb.error)}</i>` : '';
+    const recent = [...autoLog.values()].filter(l => !l.skip).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 3)
+      .map(l => `<i class="${l.ok === false ? 'bad' : ''}">${new Date(l.at).getMonth() + 1}/${new Date(l.at).getDate()} ${new Date(l.at).getHours()}:${String(new Date(l.at).getMinutes()).padStart(2, '0')} ${l.kind === 'frip' ? '프립' : '자사몰'} ${esc(l.msg || '')}</i>`);
+    el.innerHTML = head + fr + im + (recent.length ? '<br>' + recent.join('') : '');
+  }
+  async function autoLoad(){
+    const sb = asb(); if (!sb) return;
+    const [a, b] = await Promise.all([sb.from('auto_settings').select('key,value'), sb.from('auto_log').select('*').gte('at', new Date(Date.now() - 30 * 864e5).toISOString()).order('at', { ascending:false }).limit(2000)]);
+    if (a.error){ aEl('aLog').innerHTML = '<i class="bad">서버에 auto_settings 표가 아직 없어요. Supabase SQL Editor에서 auto_jobs.sql을 실행해 주세요.</i>'; return; }
+    autoCfg = {}; (a.data || []).forEach(r => { autoCfg[r.key] = r.value || {}; });
+    autoLog = new Map((b.data || []).map(r => [r.id, r]));
+    if (!autoReady){ autoReady = true; autoFill(); autoListen(sb); }
+    autoLogLine(); autoPush(); renderOrders();
+  }
+  let autoChan = null;
+  function autoListen(sb){
+    if (autoChan) return;
+    autoChan = sb.channel('mannam-auto').on('postgres_changes', { event:'*', schema:'public', table:'auto_log' }, (p) => { const n = p.new || {}; if (n.id){ autoLog.set(n.id, n); autoLogLine(); renderOrders(); } })
+      .on('postgres_changes', { event:'*', schema:'public', table:'auto_settings' }, (p) => { const n = p.new || {}; if (n.key){ autoCfg[n.key] = n.value || {}; if (n.key !== 'last_run') autoFill(); autoLogLine(); } }).subscribe();
+  }
+  async function autoSave(key, patch, msg){
+    const sb = asb(); if (!sb) return oMsg('어드민에 로그인해야 자동화 설정을 바꿀 수 있어요.', true);
+    const v = Object.assign({}, autoCfg[key] || {}, patch);
+    const { error } = await sb.from('auto_settings').upsert({ key, value:v, updated_at:new Date().toISOString() }, { onConflict:'key' });
+    if (error) return oMsg('자동화 설정 저장 실패: ' + error.message, true);
+    autoCfg[key] = v; autoLogLine(); if (msg) oMsg(msg);
+  }
+  // 상태x 제외 명단: 진행일정(일정노트) 기록은 이 브라우저에만 있어서, 서버가 쓸 수 있게 명단만 올려 둠
+  function autoPush(){
+    if (!autoReady || !SCHED || (autoCfg.frip_auto || {}).mode === 'off' || !(autoCfg.frip_auto || {}).mode) return;
+    const idx = stIdx || buildStIdx(), xs = new Set();
+    idx.forEach((l, k) => { if (l.some(h => X_RE.test(h.st))){ xs.add(k); (twoOf(k) || []).forEach(p => xs.add(p)); } });
+    const today = ymdO(new Date()), ex = new Set();
+    (Array.isArray(SCHED.events) ? SCHED.events : []).forEach(ev => { const d = String((ev.props || {}).date || '').slice(0, 10); if (d < today) return;
+      (ev.excl || []).forEach(r => { const p = digits((r.c || {}).phone); if (p.length >= 8){ ex.add(p + '|' + d); (twoOf(p) || []).forEach(q => ex.add(q + '|' + d)); } }); });
+    const xPhones = [...xs].sort(), exclKeys = [...ex].sort(), sig = xPhones.join(',') + '#' + exclKeys.join(',');
+    const cur = autoCfg.frip_auto || {}; if (sig === autoPushSig || sig === (cur.xPhones || []).join(',') + '#' + (cur.exclKeys || []).join(',')){ autoPushSig = sig; return; }
+    autoPushSig = sig; autoSave('frip_auto', { xPhones, exclKeys });
+  }
+  aEl('aFripMode').addEventListener('change', e => { const v = e.target.value; autoPushSig = ''; autoSave('frip_auto', { mode:v }, v === 'on' ? `프립 자동승인을 켰어요. ${aEl('aFripFrom').value}~${aEl('aFripTo').value}에 들어온 대기중 주문을 서버가 1분 안에 예약확정해요 (상태x 제외).` : v === 'dry' ? '프립 자동승인 리허설이에요. 확정 직전까지만 확인하고 실제로 확정하지는 않아요.' : '프립 자동승인을 껐어요.').then(() => autoPush()); });
+  ['aFripFrom', 'aFripTo'].forEach(id => aEl(id).addEventListener('change', () => { const f = aEl('aFripFrom').value, t = aEl('aFripTo').value; if (!f || !t) return; autoSave('frip_auto', { from:f, to:t }, `프립 자동승인 시간: ${f} ~ ${t}${f > t ? ' (자정 넘김)' : f === t ? ' (24시간)' : ''}`); }));
+  aEl('aFripWho').addEventListener('change', e => autoSave('frip_auto', { women:e.target.value !== 'all' }, e.target.value === 'all' ? '프립 자동승인 대상: 남녀 모두' : '프립 자동승인 대상: 여자만'));
+  aEl('aShipOn').addEventListener('change', e => { const on = e.target.value === 'on'; autoSave('imweb_ship', on ? { on:true, onAt:new Date().toISOString() } : { on:false }, on ? `자사몰 자동 배송중을 켰어요. 지금부터 결제된 주문은 결제 ${aEl('aShipMin').value}분 뒤 한 건씩 배송중으로 바뀌어요.` : '자사몰 자동 배송중을 껐어요.'); });
+  aEl('aShipMin').addEventListener('change', e => { const n = Math.max(1, Math.min(1440, +e.target.value || 30)); e.target.value = n; autoSave('imweb_ship', { delayMin:n }, `자사몰: 결제 ${n}분 뒤 배송중으로 바꿔요.`); });
+  { let tries = 0; const t = setInterval(() => { if (asb()){ clearInterval(t); autoLoad().catch(e => { aEl('aLog').innerHTML = '<i class="bad">자동화 정보를 읽지 못했어요: ' + esc(e.message || e) + '</i>'; }); setInterval(() => { if (document.visibilityState === 'visible'){ autoLogLine(); autoPush(); } }, 60000); }
+    else if (++tries > 40){ clearInterval(t); aEl('aLog').innerHTML = '<i class="bad">로그인해야 서버 자동화를 쓸 수 있어요.</i>'; } }, 1500); }
   let twoPop = null;
   function closeTwo(){ if (twoPop){ twoPop.remove(); twoPop = null; } }
   oBody.addEventListener('click', e => {
