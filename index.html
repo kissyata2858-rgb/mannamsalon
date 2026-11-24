@@ -3892,6 +3892,8 @@ const xn=camps.filter(c=>c.rows===null).length;S('완료 · 체험단 '+camps.le
     </div>`;
     document.body.appendChild(box); dockSync();
     const inp = box.querySelector('input');
+    const blank = () => box && box.classList.toggle('q-blank', isMobile() && !inp.value.trim());
+    blank(); inp.addEventListener('input', blank);
     box.addEventListener('mousedown', e => { if (e.target === box) close(); });
     box.addEventListener('click', e => {
       if (e.target.closest('[data-close]')) return close();
@@ -5428,6 +5430,9 @@ const xn=camps.filter(c=>c.rows===null).length;S('완료 · 체험단 '+camps.le
   #mnq .q-x{font-size:0!important;border:1px solid var(--line);border-radius:8px;background:none;padding:6px 10px}
   #mnq .q-x::after{content:"닫기";font-size:13px;color:var(--muted)}
   #mnq.q-blank .q-list,#mnq.q-blank .q-chips{visibility:hidden}
+  #mnq.q-blank{background:transparent!important;pointer-events:none}
+  #mnq.q-blank .q-box{background:transparent}
+  #mnq.q-blank .q-in,#mnq.q-blank .q-close{pointer-events:auto}
   /* 대시보드: 오늘 운영 요약 */
   .hero{padding:18px 14px}
   .hero h2{font-size:17px;margin:12px 0 4px}
