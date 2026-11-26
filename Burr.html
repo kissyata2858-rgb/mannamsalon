@@ -517,13 +517,19 @@ async function demux(p){
 }
 async function decodeAll(mx,onFrame){
   const q=[];let err=null;
-  const dec=new VideoDecoder({output:fr=>q.push(fr),error:e=>err=e});dec.configure(mx.cfg);
+  let last=performance.now();
+  const dec=new VideoDecoder({output:fr=>{q.push(fr);last=performance.now()},error:e=>err=e});dec.configure(mx.cfg);
   const drain=async()=>{while(q.length){const fr=q.shift();try{if(!err)await onFrame(fr)}catch(e){err=e}finally{fr.close()}}};
+  /* 디코더가 20초 넘게 프레임을 내보내지 않으면 멈춘 것으로 보고 다른 방식으로 넘어감 */
+  const stalled=()=>{if(performance.now()-last>20000)throw new Error('stall')};
   try{
     for(const c of mx.chunks){if(err)throw err;dec.decode(c);
-      while(q.length||dec.decodeQueueSize>8){await drain();if(err)throw err;if(dec.decodeQueueSize>8)await new Promise(r=>setTimeout(r,1))}}
-    await dec.flush();await drain();if(err)throw err;
-  }finally{q.forEach(fr=>fr.close());if(dec.state!=='closed')dec.close()}
+      while(q.length||dec.decodeQueueSize>6){await drain();if(err)throw err;if(dec.decodeQueueSize>6){await new Promise(r=>setTimeout(r,1));stalled()}}}
+    /* 마무리: 남은 프레임을 내보내는 동안에도 계속 받아서 처리하고 돌려줌 (그래픽카드 디코더는 돌려받아야 다음 프레임을 내보냄) */
+    let done=false;dec.flush().then(()=>done=true,e=>{err=err||e;done=true});last=performance.now();
+    while(!done||q.length){await drain();if(err)throw err;if(!done){await new Promise(r=>setTimeout(r,2));stalled()}}
+    if(err)throw err;
+  }finally{q.forEach(fr=>fr.close());q.length=0;if(dec.state!=='closed')try{dec.close()}catch(e){}}
 }
 /* 적응형 분석: 프레임마다 화면 변화량(32×18 축소판)만 싸게 계산하고,
    장면 전환·큰 움직임·불확실할 때는 매 프레임, 변화가 적은 구간은 몇 프레임 건너뛰며 얼굴을 찾음.
