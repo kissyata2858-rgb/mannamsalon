@@ -49,7 +49,8 @@ button:disabled{opacity:.45;cursor:default}
 .empty-list{font-size:13px;color:var(--mut)}
 main.stage{display:flex;flex-direction:column;gap:12px;padding:16px max(2vw,16px)}
 .tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.tools .sp{flex:1}
+.savewrap{position:relative}#saveMenu{position:absolute;top:calc(100% + 6px);right:0;z-index:5;display:flex;flex-direction:column;gap:4px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.18);min-width:180px}#saveMenu button{justify-content:flex-start;border:0}#saveMenu button:hover{background:var(--sel)}
+.tools .rgt{margin-left:auto;display:flex;gap:8px;align-items:center}
 #box{position:relative;flex:1;display:flex;align-items:flex-start;justify-content:center;min-height:360px}
 #cv{display:block;touch-action:none;border-radius:6px;box-shadow:0 1px 0 var(--line),0 8px 30px rgba(0,0,0,.12)}
 #drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;border:2px dashed var(--line);border-radius:12px;text-align:center;padding:24px;background:var(--panel)}
@@ -79,7 +80,7 @@ main.stage{display:flex;flex-direction:column;gap:12px;padding:16px max(2vw,16px
 .sw i::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
 .sw input:checked+i{background:#2e9e5b}.sw input:checked+i::after{transform:translateX(22px)}
 .sw input:focus-visible+i{outline:2px solid var(--acc);outline-offset:2px}
-button.go{margin-left:auto;background:#2e9e5b;border-color:#2e9e5b;color:#fff;font-weight:700;padding:0 20px}
+button.go{background:#2e9e5b;border-color:#2e9e5b;color:#fff;font-weight:700;padding:0 20px}
 .help{font-size:13px;color:var(--mut);display:flex;flex-wrap:wrap;gap:4px 16px}
 kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--panel)}
 @media(max-width:800px){.wrap{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}#list{max-height:220px}}
@@ -96,7 +97,7 @@ kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0
 <div class="wrap">
   <aside>
     <div class="grp">
-      <h2>블러 설정 (모든 사진·영상에 고정 적용)</h2>
+      <h2>블러 설정 (선택한 사진·영상에만 적용)</h2>
       <div class="lbl"><span>방식</span><output id="o-mode"></output></div>
       <div class="seg" id="g-mode" role="group" aria-label="가리는 방식"></div>
       <div class="lbl"><span>강도</span><output id="o-strength"></output></div>
@@ -122,16 +123,18 @@ kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0
     <div class="tools">
       <button id="prev" title="이전">◀</button>
       <button id="next" title="다음">▶</button>
-      <button id="saveOne" class="pri" disabled>이 사진 저장</button>
-      <label class="chk inl" id="muteWrap" hidden><input id="s-mute" type="checkbox"><span>소리 빼고 저장</span></label>
       <button id="add">블러 추가</button>
       <button id="accept" class="on" hidden>이 후보 블러 적용</button>
       <button id="del" disabled>선택 삭제</button>
       <button id="undo" disabled>되돌리기</button>
       <button id="lines" aria-pressed="false" title="블러 영역 바깥 점선을 숨겨서 결과만 보기">점선 숨기기</button>
       <button id="orig" disabled>원본 보기 (누르고 있기)</button>
-      <span class="sp"></span>
-      <button id="start" class="go" disabled>시작하기</button>
+      <span class="rgt">
+        <label class="chk inl" id="muteWrap" hidden><input id="s-mute" type="checkbox"><span>소리 빼고 저장</span></label>
+        <span class="savewrap"><button id="saveOne" class="pri" disabled aria-haspopup="menu">이 사진 저장</button>
+          <span id="saveMenu" role="menu" hidden><button id="smOne" role="menuitem" type="button">이 파일만 저장</button><button id="smAll" role="menuitem" type="button">전체 한 번에 저장</button></span></span>
+        <button id="start" class="go" disabled>시작하기</button>
+      </span>
     </div>
     <div id="people" hidden>
       <div class="phead"><strong>등장인물</strong><span class="sub">체크한 사람만 블러돼요. 체크를 풀면 그 사람은 블러하지 않아요. 같은 사람이 둘로 나뉘어 보일 수 있어요(옆얼굴·뒷모습 등).</span><button id="pAll" type="button">전체 선택/해제</button></div>
@@ -174,7 +177,14 @@ function loadS(){try{const v=localStorage.getItem(LS);if(v)return JSON.parse(v)|
   /* 이전 버전 설정은 인식 기준·정밀 분석만 이어받음(블러 강도·크기·가장자리는 새 기본값) */
   const old=JSON.parse(localStorage.getItem('mannam-faceblur-v5')||'{}')||{};
   const r={};if(old.conf)r.conf=old.conf;if(old.fine!=null)r.fine=old.fine;if(old.mute!=null)r.mute=old.mute;return r}catch(e){return{}}}
-function saveS(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
+/* 방식·강도·크기·가장자리는 파일마다 따로 가짐. 새로 넣는 파일은 마지막으로 바꾼 값으로 시작 */
+const VK=['mode','strength','range','feather'];
+let DEF=null;
+function saveS(){try{localStorage.setItem(LS,JSON.stringify({...S,...(DEF||{})}))}catch(e){}}
+function withCfg(p,fn){const c=p&&p.cfg;if(!c||p===items[cur])return fn();const keep={};for(const k of VK){keep[k]=S[k];S[k]=c[k]}try{return fn()}finally{Object.assign(S,keep)}}
+const PAINT={};
+function applyCur(){const p=items[cur];Object.assign(S,p&&p.cfg?p.cfg:DEF);for(const k of VK)PAINT[k]&&PAINT[k]()}
+function setCfg(k,v){S[k]=v;DEF[k]=v;const p=items[cur];if(p&&p.cfg)p.cfg[k]=v;saveS()}
 const fmt={feather:v=>v+'%',conf:v=>v+'%'};
 const SEG={mode:{vals:['blur','mosaic'],f:v=>'',b:v=>v==='mosaic'?'모자이크':'블러'},strength:{vals:[1,2,3,4,5],f:v=>v+' / 5',b:v=>String(v)},range:{vals:[100,110,120,130,140],f:v=>((v-90)/10)+' / 5 ('+v+'%)',b:v=>String((v-90)/10)}};
 
@@ -191,15 +201,17 @@ const canFilter=(()=>{const c=document.createElement('canvas').getContext('2d');
 /* ---------- 설정 ---------- */
 for(const k of Object.keys(fmt)){
   const el=$('#s-'+k);el.value=S[k];S[k]=+el.value;$('#o-'+k).textContent=fmt[k](S[k]);
-  el.addEventListener('input',()=>{S[k]=+el.value;$('#o-'+k).textContent=fmt[k](S[k]);saveS();if(k!=='conf'){draw();thumbAll()}});
+  PAINT[k]=()=>{el.value=S[k];$('#o-'+k).textContent=fmt[k](S[k])};
+  el.addEventListener('input',()=>{if(VK.includes(k))setCfg(k,+el.value);else{S[k]=+el.value;saveS()}$('#o-'+k).textContent=fmt[k](S[k]);if(k!=='conf'){draw();thumbSoon(items[cur])}});
 }
 for(const k of Object.keys(SEG)){
   const g=SEG[k],box=$('#g-'+k);if(!g.vals.includes(S[k]))S[k]=g.vals.reduce((a,b)=>Math.abs(b-S[k])<Math.abs(a-S[k])?b:a);
   const paint=()=>{$('#o-'+k).textContent=g.f(S[k]);for(const b of box.children){const on=b.dataset.v===String(S[k]);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)}};
   for(const v of g.vals){const b=document.createElement('button');b.type='button';b.dataset.v=v;b.textContent=g.b(v);
-    b.addEventListener('click',()=>{S[k]=v;paint();saveS();draw();thumbAll()});box.append(b)}
-  paint();
+    b.addEventListener('click',()=>{setCfg(k,v);paint();draw();thumbSoon(items[cur])});box.append(b)}
+  paint();PAINT[k]=paint;
 }
+DEF=Object.fromEntries(VK.map(k=>[k,S[k]]));
 {const lb=$('#lines'),pl=()=>{lb.classList.toggle('on',!!S.hideLines);lb.setAttribute('aria-pressed',!!S.hideLines);lb.textContent=S.hideLines?'점선 보이기':'점선 숨기기'};pl();
   lb.addEventListener('click',()=>{S.hideLines=!S.hideLines;pl();saveS();draw()})}
 {const a=$('#s-auto'),txt=()=>$('#autoTxt').textContent=S.auto?'켜짐 · 넣은 순서대로 자동 처리':'꺼짐 · [시작하기]를 눌러야 시작';a.checked=!!S.auto;txt();
@@ -255,39 +267,51 @@ function facesAt(p,t){
   return p.tracks.map(tr=>{const f=faceAt(tr,t);if(f&&tr.pid&&off.has(tr.pid))f.off=true;return f}).filter(Boolean);
 }
 
+const tmp3=document.createElement('canvas'),t3=tmp3.getContext('2d');
 function blurFace(c,p,src,f,s){
   const {rx,ry}=eff(f);if(rx<1||ry<1)return;
   const fe=S.feather/100,ox=rx*(1+fe),oy=ry*(1+fe),a=f.ang||0,ca=Math.cos(a),sa=Math.sin(a);
   const ex=Math.hypot(ox*ca,oy*sa),ey=Math.hypot(ox*sa,oy*ca),r=blurR(rx),pad=r*2+2;
-  const x0=Math.max(0,f.cx-ex-pad),y0=Math.max(0,f.cy-ey-pad),x1=Math.min(p.w,f.cx+ex+pad),y1=Math.min(p.h,f.cy+ey+pad);
-  const bw=x1-x0,bh=y1-y0;if(!(bw>=2&&bh>=2))return;
-  const cw=Math.max(1,Math.ceil(bw*s)),ch=Math.max(1,Math.ceil(bh*s));
+  /* 화면 밖으로 나가도 영역은 자르지 않음 */
+  const X0=f.cx-ex-pad,Y0=f.cy-ey-pad,X1=f.cx+ex+pad,Y1=f.cy+ey+pad;
+  const x0=Math.max(0,X0),y0=Math.max(0,Y0),x1=Math.min(p.w,X1),y1=Math.min(p.h,Y1);
+  if(!(x1-x0>=1&&y1-y0>=1))return;
+  const bw=X1-X0,bh=Y1-Y0,cw=Math.max(1,Math.ceil(bw*s)),ch=Math.max(1,Math.ceil(bh*s));
+  /* 바탕: 화면 안쪽은 원본, 화면 밖은 가장자리 픽셀을 늘려 채움(블러가 투명한 바깥을 끌어와 얼굴이 비치는 것 방지) */
+  tmp3.width=cw;tmp3.height=ch;
+  const dx=(x0-X0)*s,dy=(y0-Y0)*s,dw=(x1-x0)*s,dh=(y1-y0)*s;
+  t3.drawImage(src,x0,y0,x1-x0,y1-y0,dx,dy,dw,dh);
+  if(dx>0)t3.drawImage(tmp3,dx,dy,1,dh,0,dy,dx+.5,dh);
+  if(dx+dw<cw)t3.drawImage(tmp3,dx+dw-1,dy,1,dh,dx+dw-.5,dy,cw-dx-dw+.5,dh);
+  if(dy>0)t3.drawImage(tmp3,0,dy,cw,1,0,0,cw,dy+.5);
+  if(dy+dh<ch)t3.drawImage(tmp3,0,dy+dh-1,cw,1,0,dy+dh-.5,cw,ch-dy-dh+.5);
   tmp.width=cw;tmp.height=ch;tctx.globalCompositeOperation='source-over';
   if(S.mode==='mosaic'){
     const blk=Math.max(2,2*rx/MZ[S.strength-1]),sw=Math.max(1,Math.round(bw/blk)),sh=Math.max(1,Math.round(bh/blk));
     tmp2.width=sw;tmp2.height=sh;const c2=tmp2.getContext('2d');c2.imageSmoothingEnabled=true;c2.imageSmoothingQuality='high';
-    c2.drawImage(src,x0,y0,bw,bh,0,0,sw,sh);
+    c2.drawImage(tmp3,0,0,sw,sh);
     tctx.imageSmoothingEnabled=false;tctx.drawImage(tmp2,0,0,cw,ch);tctx.imageSmoothingEnabled=true;
   }else if(canFilter){
-    tctx.drawImage(src,x0,y0,bw,bh,0,0,cw,ch);
+    tctx.drawImage(tmp3,0,0);
     tctx.filter=`blur(${Math.max(.5,r*s)}px)`;
-    tctx.drawImage(src,x0,y0,bw,bh,0,0,cw,ch);tctx.drawImage(src,x0,y0,bw,bh,0,0,cw,ch);
+    tctx.drawImage(tmp3,0,0);tctx.drawImage(tmp3,0,0);
     tctx.filter='none';
   }else{
     const d=Math.max(1,r*s/1.5),sw=Math.max(1,Math.round(cw/d)),sh=Math.max(1,Math.round(ch/d));
     tmp2.width=sw;tmp2.height=sh;const c2=tmp2.getContext('2d');c2.imageSmoothingQuality='high';
-    c2.drawImage(src,x0,y0,bw,bh,0,0,sw,sh);
+    c2.drawImage(tmp3,0,0,sw,sh);
     tctx.imageSmoothingEnabled=true;tctx.imageSmoothingQuality='high';tctx.drawImage(tmp2,0,0,cw,ch);
   }
   tctx.save();tctx.globalCompositeOperation='destination-in';
   /* 타원 안쪽은 100% 블러, 부드러운 경계는 타원 '바깥'에 덧붙임 */
-  const R=ox*s;tctx.translate((f.cx-x0)*s,(f.cy-y0)*s);tctx.rotate(a);tctx.scale(1,ry/rx);
+  const R=ox*s;tctx.translate((f.cx-X0)*s,(f.cy-Y0)*s);tctx.rotate(a);tctx.scale(1,ry/rx);
   const g=tctx.createRadialGradient(0,0,0,0,0,R);
   g.addColorStop(0,'#000');g.addColorStop(1/(1+fe),'#000');g.addColorStop(1,'rgba(0,0,0,0)');
   tctx.fillStyle=g;tctx.fillRect(-1e5,-1e5,2e5,2e5);tctx.restore();
-  c.drawImage(tmp,x0*s,y0*s);
+  c.drawImage(tmp,X0*s,Y0*s);
 }
-function renderTo(c,p,s,ui,src,t){
+function renderTo(c,p,s,ui,src,t){return withCfg(p,()=>renderTo0(c,p,s,ui,src,t))}
+function renderTo0(c,p,s,ui,src,t){
   src=src||srcOf(p);t=t??tNow(p);
   c.drawImage(src,0,0,p.w*s,p.h*s);
   const fs=facesAt(p,t);
@@ -366,7 +390,7 @@ function renderList(){
     const t=document.createElement('div'),n=document.createElement('div'),s=document.createElement('div');
     n.className='nm';n.textContent=(isV(p)?'🎬 ':'')+p.name;s.className='st';s.textContent=stLabel(p);p.stEl=s;t.append(n,s);
     const x=document.createElement('button');x.className='x';x.textContent='✕';x.title='목록에서 빼기';
-    x.addEventListener('click',e=>{e.stopPropagation();if(p.st==='run'||exporting)return;if(isV(p))p.el.pause();items.splice(i,1);if(cur>=items.length)cur=items.length-1;else if(i<cur)cur--;sel=null;renderList();draw()});
+    x.addEventListener('click',e=>{e.stopPropagation();if(p.st==='run'||exporting)return;if(isV(p))p.el.pause();items.splice(i,1);if(cur>=items.length)cur=items.length-1;else if(i<cur)cur--;sel=null;applyCur();renderList();draw()});
     li.append(c,t,x);li.addEventListener('click',()=>go(i));ul.append(li);thumb(p);
   });
 }
@@ -378,14 +402,14 @@ function thumb(p){
 }
 let tt=0;function thumbSoon(p){clearTimeout(tt);tt=setTimeout(()=>p&&thumb(p),150)}
 let ta=0;function thumbAll(){clearTimeout(ta);ta=setTimeout(()=>items.forEach(thumb),250)}
-function go(i){if(i<0||i>=items.length||exporting||running&&items[cur]&&items[cur].st==='run'&&isV(items[cur]))return;const p=items[cur];if(isV(p))p.el.pause();cur=i;sel=null;setAdd(false);renderList();draw()}
+function go(i){if(i<0||i>=items.length||exporting||running&&items[cur]&&items[cur].st==='run'&&isV(items[cur]))return;const p=items[cur];if(isV(p))p.el.pause();cur=i;sel=null;setAdd(false);applyCur();renderList();draw()}
 
 /* ---------- 파일 ---------- */
 async function addFiles(files){
   for(const f of files){
     const vid=f.type.startsWith('video/')||/\.(mp4|mov|webm|m4v)$/i.test(f.name);
     if(!vid&&!f.type.startsWith('image/')&&!/\.(jpe?g|png|webp)$/i.test(f.name))continue;
-    const p={kind:vid?'video':'image',name:f.name,type:f.type,url:URL.createObjectURL(f),w:0,h:0,faces:[],tracks:[],hist:[],st:'wait'};items.push(p);
+    const p={kind:vid?'video':'image',name:f.name,type:f.type,url:URL.createObjectURL(f),w:0,h:0,faces:[],tracks:[],hist:[],st:'wait',cfg:{...DEF}};items.push(p);
     try{
       if(vid){
         const el=document.createElement('video');el.muted=true;el.playsInline=true;el.preload='auto';el.src=p.url;
@@ -398,6 +422,7 @@ async function addFiles(files){
     }catch(e){p.st='err'}
   }
   if(cur<0&&items.length)cur=Math.max(0,items.findIndex(p=>p.st!=='err'));
+  applyCur();
   renderList();draw();runQueue();
   if(!S.auto&&items.some(q=>q.st==='wait'&&!q.go))status('[시작하기]를 누르면 얼굴 찾기를 시작해요. 목록 위 [대기열 자동 블러]를 켜면 넣자마자 자동으로 시작해요.');
 }
@@ -650,10 +675,10 @@ function groupPeople(tracks){
 }
 /* 크기: 앞뒤 0.3초 중앙값 + 그 사람 평균의 0.85~1.25배로 제한 / 위치: 앞뒤 1장 중앙값(튀는 값만 제거) */
 function stabilize(keys){
-  const gw=med(keys.map(k=>k.bw)),gh=med(keys.map(k=>k.bh));
   return keys.map((k,i)=>{
     const win=keys.filter(q=>Math.abs(q.t-k.t)<=.3),pw=keys.slice(Math.max(0,i-1),i+2);
-    const bw=Math.min(Math.max(med(win.map(q=>q.bw)),gw*.85),gw*1.25),bh=Math.min(Math.max(med(win.map(q=>q.bh)),gh*.85),gh*1.25);
+    const wide=keys.filter(q=>Math.abs(q.t-k.t)<=1.5),lw=Math.max(med(wide.map(q=>q.bw)),k.bw*.8),lh=Math.max(med(wide.map(q=>q.bh)),k.bh*.8);
+    const bw=Math.min(Math.max(med(win.map(q=>q.bw)),lw*.85),lw*1.25),bh=Math.min(Math.max(med(win.map(q=>q.bh)),lh*.85),lh*1.25);
     return{t:k.t,cx:med(pw.map(q=>q.cx)),cy:med(pw.map(q=>q.cy)),bw,bh,ang:med(win.map(q=>q.ang||0))};
   });
 }
@@ -756,7 +781,27 @@ function outName(p){return base(p.name)+'_blur.'+(p.type==='image/png'?'png':'jp
 function toBlob(p){const c=document.createElement('canvas');c.width=p.w;c.height=p.h;renderTo(c.getContext('2d'),p,1,false);
   return new Promise(r=>c.toBlob(r,p.type==='image/png'?'image/png':'image/jpeg',.92))}
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000)}
-$('#saveOne').addEventListener('click',async()=>{const p=items[cur];if(!p||exporting||p.st==='run')return;if(isV(p))exportVideo(p);else dl(await toBlob(p),outName(p))});
+async function saveCur(){const p=items[cur];if(!p||exporting||p.st==='run')return;if(isV(p))await exportVideo(p);else dl(await toBlob(p),outName(p))}
+/* 목록에 1개면 바로 저장, 여러 개면 [이 파일만 / 전체 한 번에] 선택 */
+const sm=$('#saveMenu');
+$('#saveOne').addEventListener('click',e=>{e.stopPropagation();if(items.filter(q=>q.st!=='err').length<=1){saveCur();return}sm.hidden=!sm.hidden});
+$('#smOne').addEventListener('click',()=>{sm.hidden=true;saveCur()});
+$('#smAll').addEventListener('click',()=>{sm.hidden=true;saveEverything()});
+document.addEventListener('click',e=>{if(!sm.hidden&&!e.target.closest('.savewrap'))sm.hidden=true});
+async function saveEverything(){
+  if(exporting)return;
+  const ready=items.filter(q=>q.st!=='err'&&q.st!=='wait'&&q.st!=='run'),skip=items.filter(q=>q.st==='wait'||q.st==='run').length;
+  const ps=ready.filter(q=>!isV(q)&&q.img),vs=ready.filter(isV);
+  if(!ready.length){status('아직 처리된 파일이 없어요. [시작하기]로 얼굴 찾기를 먼저 해 주세요.');return}
+  if(ps.length===1)dl(await toBlob(ps[0]),outName(ps[0]));
+  else if(ps.length>1){status('사진 ZIP 만드는 중…');
+    try{const Z=await loadZip(),z=new Z(),used=new Set();
+      for(const p of ps){let n=outName(p),k=2;while(used.has(n))n=n.replace(/(\.\w+)$/,`_${k++}$1`);used.add(n);z.file(n,await toBlob(p))}
+      dl(await z.generateAsync({type:'blob'}),'얼굴블러_'+new Date().toISOString().slice(0,10)+'.zip')}
+    catch(e){for(const p of ps){dl(await toBlob(p),outName(p));await new Promise(r=>setTimeout(r,400))}}}
+  for(const [i,p] of vs.entries()){status(`영상 저장 준비 중… (${i+1}/${vs.length}) ${p.name}`);await exportVideo(p);await new Promise(r=>setTimeout(r,400))}
+  status(`전체 저장 완료 · 사진 ${ps.length}장`+(ps.length>1?'(ZIP)':'')+`, 영상 ${vs.length}개`+(skip?` · 아직 처리 안 된 ${skip}개는 빠졌어요`:''));
+}
 function loadZip(){return window.JSZip?Promise.resolve(window.JSZip):loadScript(JSZIP).then(()=>window.JSZip)}
 $('#saveAll').addEventListener('click',async()=>{
   const ps=items.filter(p=>!isV(p)&&p.img);if(!ps.length)return;
