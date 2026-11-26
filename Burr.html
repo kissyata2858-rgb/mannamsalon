@@ -72,6 +72,14 @@ main.stage{display:flex;flex-direction:column;gap:12px;padding:16px max(2vw,16px
 .eng{font-size:12px;margin-top:4px;font-weight:500}.eng.gpu{color:#2e8b57}.eng.cpu{color:#c0392b}
 .seg{display:flex;gap:4px;margin-bottom:12px}.seg button{flex:1;min-height:36px;padding:0 4px;justify-content:center;font-variant-numeric:tabular-nums}
 .lbl{display:flex;justify-content:space-between;font-weight:500;margin-bottom:4px}.lbl output{color:var(--mut);font-size:13px}
+.swrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;font-weight:500;cursor:pointer}
+.swrow small{display:block;font-weight:400;color:var(--mut);font-size:12px}
+.sw{position:relative;flex:none;width:52px;height:30px}.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.sw i{position:absolute;inset:0;border-radius:15px;background:var(--line);transition:background .2s}
+.sw i::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.sw input:checked+i{background:#2e9e5b}.sw input:checked+i::after{transform:translateX(22px)}
+.sw input:focus-visible+i{outline:2px solid var(--acc);outline-offset:2px}
+button.go{margin-left:auto;background:#2e9e5b;border-color:#2e9e5b;color:#fff;font-weight:700;padding:0 20px}
 .help{font-size:13px;color:var(--mut);display:flex;flex-wrap:wrap;gap:4px 16px}
 kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--panel)}
 @media(max-width:800px){.wrap{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}#list{max-height:220px}}
@@ -104,6 +112,7 @@ kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0
       <p class="note">인식 기준을 높이면 엉뚱한 인식이 줄고, 낮추면 놓치는 얼굴이 줄어요. 바꾼 뒤 새로 넣는 사진·영상부터 적용돼요.</p>
     </div>
     <div class="grp">
+      <label class="swrow"><span>대기열 자동 블러<small id="autoTxt"></small></span><span class="sw"><input id="s-auto" type="checkbox" role="switch"><i></i></span></label>
       <h2>목록 <span id="cnt"></span></h2>
       <ul id="list"></ul>
       <div class="empty-list" id="emptyList">아직 사진이나 영상이 없어요.</div>
@@ -113,6 +122,8 @@ kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0
     <div class="tools">
       <button id="prev" title="이전">◀</button>
       <button id="next" title="다음">▶</button>
+      <button id="saveOne" class="pri" disabled>이 사진 저장</button>
+      <label class="chk inl" id="muteWrap" hidden><input id="s-mute" type="checkbox"><span>소리 빼고 저장</span></label>
       <button id="add">블러 추가</button>
       <button id="accept" class="on" hidden>이 후보 블러 적용</button>
       <button id="del" disabled>선택 삭제</button>
@@ -120,8 +131,7 @@ kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0
       <button id="lines" aria-pressed="false" title="블러 영역 바깥 점선을 숨겨서 결과만 보기">점선 숨기기</button>
       <button id="orig" disabled>원본 보기 (누르고 있기)</button>
       <span class="sp"></span>
-      <label class="chk inl" id="muteWrap" hidden><input id="s-mute" type="checkbox"><span>소리 빼고 저장</span></label>
-      <button id="saveOne" class="pri" disabled>이 사진 저장</button>
+      <button id="start" class="go" disabled>시작하기</button>
     </div>
     <div id="people" hidden>
       <div class="phead"><strong>등장인물</strong><span class="sub">체크한 사람만 블러돼요. 체크를 풀면 그 사람은 블러하지 않아요. 같은 사람이 둘로 나뉘어 보일 수 있어요(옆얼굴·뒷모습 등).</span><button id="pAll" type="button">전체 선택/해제</button></div>
@@ -131,7 +141,7 @@ kbd{font:12px system-ui;border:1px solid var(--line);border-radius:4px;padding:0
       <canvas id="cv" hidden></canvas>
       <div id="drop">
         <strong>사진이나 영상을 여기로 끌어다 놓으세요</strong>
-        <span class="sub">여러 개를 한 번에 넣을 수 있어요. 얼굴을 찾아서 바로 블러해 드려요.</span>
+        <span class="sub">여러 개를 한 번에 넣을 수 있어요. [시작하기]를 누르면 얼굴을 찾아 블러해요. (대기열 자동 블러를 켜면 넣자마자 시작)</span>
         <label class="btn pri">파일 선택<input id="file2" type="file" accept="image/*,video/*" multiple></label>
       </div>
     </div>
@@ -159,7 +169,7 @@ const SFACE_B64='CAYSDW9ubngucXVhbnRpemUaBTAuMS4wOrSG3AQKNQoEZGF0YQoKc2NhbGFyX29
 const LS='mannam-faceblur-v6';
 const K=[.03,.045,.06,.08,.10],MZ=[14,11,9,7,5];
 const CUT=.11,IN=640,LEAD=.05; /* 얼굴이 잡히기·장면 전환 0.05초 전부터 블러 시작 */
-const S=Object.assign({strength:3,range:120,feather:25,conf:60,fine:true,mute:false,hideLines:false,mode:'blur'},loadS());
+const S=Object.assign({strength:3,range:120,feather:25,conf:60,fine:true,mute:false,hideLines:false,mode:'blur',auto:false},loadS());
 function loadS(){try{const v=localStorage.getItem(LS);if(v)return JSON.parse(v)||{};
   /* 이전 버전 설정은 인식 기준·정밀 분석만 이어받음(블러 강도·크기·가장자리는 새 기본값) */
   const old=JSON.parse(localStorage.getItem('mannam-faceblur-v5')||'{}')||{};
@@ -192,6 +202,9 @@ for(const k of Object.keys(SEG)){
 }
 {const lb=$('#lines'),pl=()=>{lb.classList.toggle('on',!!S.hideLines);lb.setAttribute('aria-pressed',!!S.hideLines);lb.textContent=S.hideLines?'점선 보이기':'점선 숨기기'};pl();
   lb.addEventListener('click',()=>{S.hideLines=!S.hideLines;pl();saveS();draw()})}
+{const a=$('#s-auto'),txt=()=>$('#autoTxt').textContent=S.auto?'켜짐 · 넣은 순서대로 자동 처리':'꺼짐 · [시작하기]를 눌러야 시작';a.checked=!!S.auto;txt();
+  a.addEventListener('change',()=>{S.auto=a.checked;txt();saveS();items.forEach(thumb);runQueue()})}
+$('#start').addEventListener('click',()=>{const p=items[cur];if(!p||p.st!=='wait')return;p.go=true;thumb(p);draw();runQueue()});
 $('#s-mute').checked=!!S.mute;$('#s-mute').addEventListener('change',e=>{S.mute=e.target.checked;saveS()});
 $('#s-fine').checked=!!S.fine;$('#s-fine').addEventListener('change',e=>{S.fine=e.target.checked;saveS()});
 
@@ -305,6 +318,7 @@ function drawNow(){
   const p=items[cur],has=!!(p&&srcOf(p)),busy=has&&(p.st==='run'||!!exporting);
   cv.hidden=!has;$('#drop').hidden=items.length>0;$('#vbar').hidden=!isV(p);
   for(const id of ['#orig','#saveOne','#add'])$(id).disabled=!has||busy;
+  $('#start').disabled=!has||p.st!=='wait'||!!p.go||!!exporting;$('#start').textContent=p&&p.st==='wait'&&p.go?'곧 시작':p&&p.st==='run'?'분석 중…':'시작하기';
   $('#del').disabled=!has||!sel||busy;$('#accept').hidden=!has||!sel||!sel.cand||busy;$('#undo').disabled=!has||!p.hist.length||busy;
   $('#saveAll').disabled=!items.some(q=>!isV(q)&&q.img);$('#prev').disabled=cur<=0;$('#next').disabled=cur>=items.length-1;
   $('#saveOne').textContent=isV(p)?'이 영상 저장':'이 사진 저장';$('#muteWrap').hidden=!isV(p);renderPeople(p);
@@ -339,7 +353,7 @@ function status(t,btn){const s=$('#status');s.textContent=t;if(btn){const b=docu
 function stLabel(p){
   if(p.st==='err')return isV(p)?'이 영상 형식은 열 수 없어요':'불러오기 실패';
   if(p.st==='run')return isV(p)?`분석 중 ${p.prog||0}%`:'감지 중…';
-  if(p.st==='wait')return '감지 대기';
+  if(p.st==='wait')return S.auto||p.go?'감지 대기':'시작 대기 · [시작하기]';
   const arr=isV(p)?p.tracks:p.faces,c=arr.filter(f=>f.cand).length;
   const n=(isV(p)?`영상 · 얼굴 ${arr.length-c}개 구간`:`얼굴 ${arr.length-c}개`)+(c?` · 후보 ${c}`:'');
   return p.st==='manual'?n+' (직접 추가)':n;
@@ -385,6 +399,7 @@ async function addFiles(files){
   }
   if(cur<0&&items.length)cur=Math.max(0,items.findIndex(p=>p.st!=='err'));
   renderList();draw();runQueue();
+  if(!S.auto&&items.some(q=>q.st==='wait'&&!q.go))status('[시작하기]를 누르면 얼굴 찾기를 시작해요. 목록 위 [대기열 자동 블러]를 켜면 넣자마자 자동으로 시작해요.');
 }
 for(const id of ['#file','#file2'])$(id).addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value=''});
 ['dragenter','dragover'].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();$('#drop').classList.add('hot')}));
@@ -646,7 +661,7 @@ async function runQueue(){
   if(running)return;running=true;
   try{
     for(;;){
-      const p=items.find(q=>q.st==='wait');if(!p)break;
+      const p=items.find(q=>q.st==='wait'&&(S.auto||q.go));if(!p)break;
       p.st='run';p.prog=0;thumb(p);draw();status(`얼굴 찾는 중… ${p.name}`);
       try{if(isV(p)){const r=await analyzeVideo(p);p.tracks=r.tracks;p.cuts=r.cuts;p.people=r.people}else p.faces=await detectImage(p);p.st='done'}
       catch(e){console.error(e);items.forEach(q=>{if(q.st==='wait'||q.st==='run')q.st='manual'});
