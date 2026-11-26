@@ -655,7 +655,8 @@ function buildTracks(samples,dur,given){
       all.push({id:uid++,manual:false,sx:1,sy:1,s:m,cand:m<S.conf/100,a,b:Math.min(b,dur+1),keys:stabilize(tr.keys),emb:meanEmb(tr.embs),th:tr.th,ths:tr.ths||0});
     }
   }
-  return{tracks:all,cuts,people:groupPeople(all)};
+  const people=groupPeople(all),keep=new Set(people.map(q=>q.id));
+  return{tracks:all.filter(t=>keep.has(t.pid)),cuts,people};
 }
 function addEmb(tr,f){if(!f.emb)return;(tr.embs||(tr.embs=[])).push(f.emb);if(f.s>(tr.ths||0)){tr.ths=f.s;tr.th=f.th}}
 function meanEmb(es){if(!es||!es.length)return null;const m=new Float32Array(es[0].length);for(const e of es)for(let i=0;i<m.length;i++)m[i]+=e[i];let q=0;for(const v of m)q+=v*v;q=Math.sqrt(q)||1;return Array.from(m,v=>v/q)}
@@ -670,6 +671,8 @@ function groupPeople(tracks){
     if(bi<0)break;const A=G[bi],B=G[bj],m=A.emb.map((v,k)=>v*A.n+B.emb[k]*B.n);let q=0;for(const v of m)q+=v*v;q=Math.sqrt(q)||1;
     G[bi]={ts:A.ts.concat(B.ts),emb:m.map(v=>v/q),n:A.n+B.n};G.splice(bj,1);}
   const people=G.map(g=>{const dur=g.ts.reduce((a,t)=>a+Math.max(.04,t.keys[t.keys.length-1].t-t.keys[0].t),0),b=g.ts.reduce((x,t)=>(t.ths||0)>(x.ths||0)?t:x,g.ts[0]);return{g,dur,th:b.th}})
+    /* 사람 아님 정리: 얼굴 확신이 한 번도 높지 않아 썸네일이 없고 3초 이하로만 잡힌 후보는 목록·영상에서 지움 */
+    .filter(q=>q.th||q.dur>3)
     .sort((a,b)=>b.dur-a.dur).map((q,i)=>{const id=i+1;q.g.ts.forEach(t=>t.pid=id);return{id,th:q.th,dur:q.dur,n:q.g.ts.length,on:true}});
   tracks.forEach(t=>{delete t.emb});return people;
 }
