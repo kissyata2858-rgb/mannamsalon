@@ -2242,7 +2242,7 @@ window.MannamCalendarMaker={refresh:()=>{renderStepper();fitPreviews();}};
   aEl('aFripWho').addEventListener('change', e => autoSave('frip_auto', { women:e.target.value !== 'all' }, e.target.value === 'all' ? '프립 자동승인 대상: 남녀 모두' : '프립 자동승인 대상: 여자만'));
   aEl('aShipOn').addEventListener('change', e => { const on = e.target.value === 'on'; autoSave('imweb_ship', on ? { on:true, onAt:new Date().toISOString() } : { on:false }, on ? `자사몰 자동 배송중을 켰어요. 지금부터 결제된 주문은 결제 ${aEl('aShipMin').value}분 뒤 한 건씩 배송중으로 바뀌어요.` : '자사몰 자동 배송중을 껐어요.'); });
   aEl('aShipMin').addEventListener('change', e => { const n = Math.max(1, Math.min(1440, +e.target.value || 30)); e.target.value = n; autoSave('imweb_ship', { delayMin:n }, `자사몰: 결제 ${n}분 뒤 배송중으로 바꿔요.`); });
-  { let tries = 0; const t = setInterval(() => { if (asb()){ clearInterval(t); autoLoad().catch(e => { aEl('aLog').innerHTML = '<i class="bad">자동화 정보를 읽지 못했어요: ' + esc(e.message || e) + '</i>'; }); setInterval(() => { if (document.visibilityState === 'visible'){ autoLogLine(); autoPush(); } }, 60000); }
+  { let tries = 0; const t = setInterval(() => { if (asb()){ clearInterval(t); autoLoad().catch(e => { aEl('aLog').innerHTML = '<i class="bad">자동화 정보를 읽지 못했어요: ' + esc(e.message || e) + '</i>'; }); setInterval(() => { if (document.visibilityState === 'visible') autoLoad().catch(() => { autoLogLine(); }); }, 60000); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoLoad().catch(() => {}); }); }
     else if (++tries > 40){ clearInterval(t); aEl('aLog').innerHTML = '<i class="bad">로그인해야 서버 자동화를 쓸 수 있어요.</i>'; } }, 1500); }
   let twoPop = null;
   function closeTwo(){ if (twoPop){ twoPop.remove(); twoPop = null; } }
