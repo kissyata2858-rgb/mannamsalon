@@ -486,28 +486,16 @@ function signature(src){sgx.drawImage(src,0,0,32,18);const d=sgx.getImageData(0,
 function sigRead(){const d=sgx.getImageData(0,0,32,18).data,g=new Float32Array(576);for(let i=0;i<576;i++)g[i]=(d[i*4]*.3+d[i*4+1]*.59+d[i*4+2]*.11)/255;return g}
 function sigDiff(a,b){let s=0;for(let i=0;i<a.length;i++)s+=Math.abs(a[i]-b[i]);return s/a.length}
 
-/* 영상 분석: 영상을 재생하면서 들어오는 프레임마다 얼굴을 찾음(되감기 없이 정확한 프레임 시간 사용) */
+/* 예비 분석: 영상을 1/30초씩 정확히 이동하며 모든 지점을 검사 — 컴퓨터가 느려도 건너뛰는 프레임이 없어 결과가 같음(시간만 더 걸림) */
 async function analyzePlayback(p){
   await net();const el=p.el;el.pause();await seek(el,0);
   const s=Math.min(1,IN/Math.max(p.w,p.h)),fc=document.createElement('canvas');fc.width=Math.round(p.w*s);fc.height=Math.round(p.h*s);
-  const fx=fc.getContext('2d',{willReadFrequently:true}),lo=Math.max(.35,S.conf/100-.15),samples=[],t0=performance.now();
-  const add=async t=>{fx.drawImage(el,0,0,fc.width,fc.height);const sig=signature(fc);
+  const fx=fc.getContext('2d',{willReadFrequently:true}),lo=Math.max(.35,S.conf/100-.15),samples=[],t0=performance.now(),STEP=1/30;
+  for(let i=0,t=0;t<p.dur;t=++i*STEP){
+    await seek(el,t);fx.drawImage(el,0,0,fc.width,fc.height);const sig=signature(fc);
     const ds=await runNet(fc,0,0,fc.width,fc.height,lo);
     samples.push({t,sig,faces:await enrich(fc,ds,samples.length,1/s)});
-    p.prog=Math.min(99,Math.round(t/p.dur*100));thumb(p);if(items[cur]===p)status(`영상 분석 중… ${p.prog}%${remain(t0,t/p.dur)} · 분석이 끝날 때까지 이 탭을 화면에 띄워 두세요.`)};
-  if(el.requestVideoFrameCallback){
-    el.playbackRate=S.fine?.5:1;el.muted=true;
-    await new Promise((resolve,reject)=>{
-      let busy=null,ended=false,stall=0;
-      const fin=async()=>{if(ended)return;ended=true;clearInterval(wd);if(busy)await busy;resolve()};
-      const cb=(now,meta)=>{if(ended)return;if(!busy){busy=add(meta.mediaTime).catch(reject).finally(()=>busy=null)}el.requestVideoFrameCallback(cb)};
-      el.onended=fin;el.requestVideoFrameCallback(cb);
-      el.play().catch(reject);
-      const wd=setInterval(()=>{if(el.ended)fin();else if(el.paused&&!ended){if(++stall>3)el.play().catch(()=>{})}else stall=0},1000);
-    });
-    el.onended=null;el.playbackRate=1;
-  }else{
-    for(let t=0;t<p.dur;t+=1/12){await seek(el,t);await add(t)}
+    if(i%10===0){p.prog=Math.min(99,Math.round(t/p.dur*100));thumb(p);if(items[cur]===p)status(`영상 분석 중… ${p.prog}%${remain(t0,t/p.dur)} · 분석이 끝날 때까지 이 탭을 열어 두세요.`)}
   }
   await seek(el,0);
   return buildTracks(samples,p.dur);
@@ -525,7 +513,7 @@ async function demux(p){
   f.appendBuffer(buf);f.flush();
   if(!info||!info.videoTracks.length)throw new Error('novideo');
   const v=info.videoTracks[0],m=Array.from(v.matrix||[]);
-  if(m.length&&(m[1]!==0||m[3]!==0||m[0]<0||m[4]<0))throw new Error('rotated');
+  let rot=0;if(m.length){if(m[0]*m[4]-m[1]*m[3]<0)throw new Error('flipped');rot=((Math.round(Math.atan2(m[1],m[0])*180/Math.PI/90)*90)%360+360)%360}
   const e=f.getTrackById(v.id).mdia.minf.stbl.stsd.entries[0],box=e.avcC||e.hvcC||e.vpcC||e.av1C;let desc;
   if(box){const DS=MP4Box.DataStream||window.DataStream,st=new DS(undefined,0,DS.BIG_ENDIAN);box.write(st);desc=new Uint8Array(st.buffer,8)}
   const vs=S[v.id]||[];if(!vs.length)throw new Error('nosamples');
@@ -537,8 +525,14 @@ async function demux(p){
   let audio=null;const a=info.audioTracks[0];
   if(a){audio={codec:a.codec,rate:a.audio.sample_rate,ch:a.audio.channel_count,samples:(S[a.id]||[]).map(q=>({data:q.data,key:q.is_sync,t:Math.round(1e6*q.cts/q.timescale),d:Math.round(1e6*q.duration/q.timescale)}))};
     if(/^mp4a/.test(a.codec))try{const ae=f.getTrackById(a.id).mdia.minf.stbl.stsd.entries[0];audio.desc=new Uint8Array(ae.esds.esd.descs[0].descs[0].data)}catch(err){}}
-  p.mx={cfg,chunks,audio,n:vs.length,fps:vs.length/(p.dur||1)};return p.mx;
+  p.mx={cfg,chunks,audio,rot,n:vs.length,fps:vs.length/(p.dur||1)};return p.mx;
 }
+/* 세로 영상(회전 정보 포함): 꺼낸 프레임을 화면 방향으로 돌려서 사용 */
+const oc=document.createElement('canvas'),ox=oc.getContext('2d');
+function orient(p,fr){const r=p.mx&&p.mx.rot;if(!r)return fr;
+  if(oc.width!==p.w||oc.height!==p.h){oc.width=p.w;oc.height=p.h}
+  if(r===90)ox.setTransform(0,1,-1,0,p.w,0);else if(r===180)ox.setTransform(-1,0,0,-1,p.w,p.h);else ox.setTransform(0,-1,1,0,0,p.h);
+  ox.drawImage(fr,0,0);ox.setTransform(1,0,0,1,0,0);return oc}
 async function decodeAll(mx,onFrame){
   const q=[];let err=null;
   let last=performance.now();
@@ -568,14 +562,14 @@ async function analyzeFast(p){
   await decodeAll(mx,async fr=>{
     if(err)throw err;
     const k=i++,t=fr.timestamp/1e6;
-    sgx.drawImage(fr,0,0,32,18);const sig=sigRead();
+    const img=orient(p,fr);sgx.drawImage(img,0,0,32,18);const sig=sigRead();
     const dPrev=prev?sigDiff(sig,prev):1,dDet=detSig?sigDiff(sig,detSig):1;prev=sig;since++;
     let go=k===0||since>=MAXGAP||dense>0||dDet>MOVE;
     if(k>0&&dPrev>CUT){cuts.push(t);go=true;dense=Math.max(dense,3)}
     if(dense>0)dense--;
     if(!go)return;
     since=0;detSig=sig;nDet++;
-    fx.drawImage(fr,0,0,fc.width,fc.height);const pp=prep(fc,0,0,fc.width,fc.height);
+    fx.drawImage(img,0,0,fc.width,fc.height);const pp=prep(fc,0,0,fc.width,fc.height);
     const wantEmb=t-lastEmb>=1;const bmp=wantEmb?await createImageBitmap(fc):null;if(wantEmb)lastEmb=t;
     const slot={t,sig,faces:[]};samples.push(slot);
     pending++;
@@ -809,7 +803,7 @@ async function exportFast(p){
   try{
     await decodeAll(mx,async fr=>{
       if(job.cancel)throw new Error('cancel');if(err)throw err;
-      renderTo(x,p,W/p.w,false,fr,fr.timestamp/1e6);
+      renderTo(x,p,W/p.w,false,orient(p,fr),fr.timestamp/1e6);
       const vf=new VideoFrame(c,{timestamp:fr.timestamp,duration:fr.duration||Math.round(1e6/fps)});enc.encode(vf,{keyFrame:i%gop===0});vf.close();i++;
       while(enc.encodeQueueSize>6)await new Promise(r=>setTimeout(r,1));
       if(i%15===0)status(`영상 저장 중… ${Math.min(99,Math.round(i/mx.n*100))}%${remain(t0,i/mx.n)} · ${engine==='GPU'?'그래픽카드':'CPU'} 사용`,['취소',()=>{job.cancel=true}]);
