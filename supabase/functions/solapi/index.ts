@@ -43,7 +43,10 @@ Deno.serve(async (req) => {
   // 2) 연결 확인: 솔라피 잔액 조회
   if (body.action === 'ping') {
     const r = await fetch('https://api.solapi.com/cash/v1/balance', { headers: { Authorization: await authHeader() } });
-    return json({ ok: r.ok, status: r.status, result: await r.json().catch(() => ({})), pfId: !!env('SOLAPI_PFID') }, r.ok ? 200 : 502);
+    const out = await r.json().catch(() => ({}));
+    // 실패해도 200으로 돌려서 어드민 화면에 솔라피가 준 이유(errorCode · errorMessage)가 그대로 보이게
+    return json({ ok: r.ok, status: r.status, result: out, pfId: !!env('SOLAPI_PFID'),
+      error: r.ok ? undefined : `솔라피 ${r.status} ${out.errorCode || ''} ${out.errorMessage || out.message || ''}`.trim() });
   }
 
   // 3) 발송: messages = [{ type:'ata', to, templateId, variables }, { type:'sms', to, text }]
@@ -67,5 +70,5 @@ Deno.serve(async (req) => {
   });
   const out = await r.json().catch(() => ({}));
   const failed = (out.failedMessageList || []).map((f: any) => ({ to: f.to, code: f.statusCode, msg: f.statusMessage }));
-  return json({ ok: r.ok && failed.length < messages.length, sent: messages.length - failed.length, failed, status: r.status, error: r.ok ? undefined : (out.errorMessage || out.message || '솔라피 오류') }, r.ok ? 200 : 502);
+  return json({ ok: r.ok && failed.length < messages.length, sent: messages.length - failed.length, failed, status: r.status, error: r.ok ? undefined : `솔라피 ${r.status} ${out.errorCode || ''} ${out.errorMessage || out.message || '오류'}`.trim() });
 });
